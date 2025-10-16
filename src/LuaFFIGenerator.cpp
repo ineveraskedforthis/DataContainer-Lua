@@ -1503,7 +1503,7 @@ int main(int argc, char *argv[]) {
 
 	{
 		std::fstream fileout;
-		fileout.open(lua_folder + "/ids.lua", std::ios::out);
+		fileout.open(lua_folder + "/_ids.lua", std::ios::out);
 		if(fileout.is_open()) {
 			fileout << lua_ids_collection;
 			fileout.close();
