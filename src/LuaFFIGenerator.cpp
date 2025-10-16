@@ -83,6 +83,23 @@ enum class lua_type_match {
 	integer, floating_point, boolean, lua_object, handle_to_integer, opaque
 };
 
+std::string convert_lua_enum_to_type(lua_type_match v) {
+	switch (v){
+        case lua_type_match::integer:
+		return "number";
+        case lua_type_match::floating_point:
+		return "number";
+        case lua_type_match::boolean:
+		return "boolean";
+        case lua_type_match::lua_object:
+		return "table";
+        case lua_type_match::handle_to_integer:
+		return "number";
+        case lua_type_match::opaque:
+		return "table";
+        }
+}
+
 inline lua_type_match normalize_type(std::string const& in, std::set<std::string> const& made_types) {
 	if(in == "char" || in == "unsigned char" || in == "bool" || in == "int8_t" || in == "uint8_t")
 		return lua_type_match::integer;
@@ -128,13 +145,17 @@ std::string convert_raw_to_index (file_def& file, std::string index_type, std::s
 	if(norm_index_type == lua_type_match::handle_to_integer) {
 		index_access_string = convert_raw_to_id_from_id(file, index_type, raw_index);
 	} else {
-		index_access_string = "\tauto sub_index = " + index_type + "(idx);\n";
+		index_access_string = "(" + index_type + ")(" + raw_index + ");\n";
 	}
 	return index_access_string;
 }
 
 std::string declare_id_from_raw (std::string indent, file_def& file, std::string object_name, std::string raw_id, std::string id) {
 	return indent + "auto " + id + " = " + convert_raw_to_id(file, object_name, raw_id) + ";\n";
+}
+
+std::string declare_id_from_raw_id (std::string indent, file_def& file, std::string object_name, std::string raw_id, std::string id) {
+	return indent + "auto " + id + " = " + convert_raw_to_id_from_id(file, object_name, raw_id) + ";\n";
 }
 
 std::string declare_index_from_raw (std::string indent, file_def& file, std::string index_type, std::string raw_index, std::string index) {
@@ -150,7 +171,7 @@ std::string access_property_name(
 std::string access_core_property_name(
 	std::string object_name, std::string property
 ) {
-	return "state->" + object_name + "_" + property;
+	return "state_ffi_ptr->" + object_name + "_" + property;
 }
 
 std::string id_to_value_body(
@@ -167,12 +188,40 @@ std::string id_to_value_body(
 	return generated;
 }
 
+
+std::string id_index_to_id_body(
+	file_def& file, std::string object_name, std::string property
+) {
+	std::string generated = "";
+	generated += "{\n";
+
+	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
+	generated += "\tauto result = " + access_core_property_name(object_name, property) + "(true_id, index);\n";
+	generated += "\treturn result.id.index();\n";
+
+	generated += "}\n";
+	return generated;
+}
+
+std::string id_index_id_to_void_body(
+	file_def& file, std::string object_name, std::string target_id_name, std::string property
+) {
+	std::string generated = "";
+	generated += "{\n";
+
+	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
+	generated += declare_id_from_raw_id("\t", file, target_id_name, "raw_target_id", "true_target_id");
+	generated += "\t" + access_core_property_name(object_name, property) + "(true_id, index, true_target_id);\n";
+	generated += "}\n";
+	return generated;
+}
+
 std::string value_to_void_body(
 	file_def& file, std::string object_name, std::string property
 ) {
 	std::string generated = "";
 	generated += "{\n";
-	generated += "\tauto result = " + access_core_property_name(object_name, property) + "(value);\n";
+	generated += "\t" + access_core_property_name(object_name, property) + "(value);\n";
 	generated += "}\n";
 	return generated;
 }
@@ -223,8 +272,44 @@ std::string id_index_to_value_body(
 	generated += "{\n";
 
 	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += declare_index_from_raw("\t", file, index_type, "raw_index_id", "true_index_id");
-	generated += "\treturn " + access_core_property_name(object_name, property) + "(true_id, true_index_id);\n";
+	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
+	generated += "\treturn " + access_core_property_name(object_name, property) + "(true_id, true_index);\n";
+
+	generated += "}\n";
+	return generated;
+}
+
+std::string id_to_id_body(
+	file_def& file, std::string object_name, std::string target_type, std::string property
+) {
+	std::string generated = "";
+	generated += "{\n";
+	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
+	generated += "\treturn " + access_core_property_name(object_name, property) + "(true_id).index();\n";
+	generated += "}\n";
+	return generated;
+}
+
+std::string id_to_id_fat_body(
+	file_def& file, std::string object_name, std::string target_type, std::string property
+) {
+	std::string generated = "";
+	generated += "{\n";
+	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
+	generated += "\treturn " + access_core_property_name(object_name, property) + "(true_id).id.index();\n";
+	generated += "}\n";
+	return generated;
+}
+
+std::string id_id_to_void_body(
+	file_def& file, std::string object_name, std::string target_type, std::string property
+) {
+	std::string generated = "";
+	generated += "{\n";
+
+	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
+	generated += declare_id_from_raw_id("\t", file, target_type, "raw_target_id", "true_target_id");
+	generated +=  "\t" + access_core_property_name(object_name, property) + "(true_id, true_target_id);\n";
 
 	generated += "}\n";
 	return generated;
@@ -237,8 +322,8 @@ std::string id_index_value_to_void_body(
 	generated += "{\n";
 
 	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += declare_index_from_raw("\t", file, index_type, "raw_index_id", "true_index_id");
-	generated +=  "\treturn " + access_core_property_name(object_name, property) + "(true_id, true_index_id, value);\n";
+	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
+	generated +=  "\t" + access_core_property_name(object_name, property) + "(true_id, true_index, value);\n";
 
 	generated += "}\n";
 	return generated;
@@ -250,6 +335,30 @@ std::string id_to_value_head(
 	std::string object, std::string project_prefix, std::string property, std::string result_type
 ) {
 	return result_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
+}
+
+std::string id_to_id_head(
+	std::string object, std::string project_prefix, std::string property
+) {
+	return "int32_t " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
+}
+
+std::string id_id_to_void_head(
+	std::string object, std::string project_prefix, std::string property
+) {
+	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_target_id)";
+}
+
+std::string id_index_to_id_head(
+	std::string object, std::string project_prefix, std::string property
+) {
+	return "int32_t " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t index)";
+}
+
+std::string id_index_id_to_void_head(
+	std::string object, std::string project_prefix, std::string property
+) {
+	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t index, int32_t raw_target_id)";
 }
 
 std::string void_to_value_head(
@@ -287,6 +396,11 @@ std::string id_index_to_value_head(
 	std::string object, std::string project_prefix, std::string property, std::string value_type
 ) {
 	return value_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
+}
+std::string id_index_value_to_void_head(
+	std::string object, std::string project_prefix, std::string property, std::string value_type
+) {
+	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index, " + value_type + " value)";
 }
 
 std::string value_to_void_head(
@@ -642,18 +756,10 @@ int main(int argc, char *argv[]) {
 	header_output += "#include <stdint.h>\n";
 	header_output += "using lua_reference_type = int32_t;\n";
 	header_output += "#include \"" + base_include_name + "\"\n";
-	header_output += "#ifdef DCON_LUADLL_EXPORTS\n";
 	header_output += "#ifdef _WIN32\n";
 	header_output += "#define DCON_LUADLL_API __declspec(dllexport)\n";
 	header_output += "#else\n";
 	header_output += "#define DCON_LUADLL_API __attribute__((visibility(\"default\")))\n";
-	header_output += "#endif\n";
-	header_output += "#else\n";
-	header_output += "#ifdef _WIN32\n";
-	header_output += "#define DCON_LUADLL_API __declspec(dllimport)\n";
-	header_output += "#else\n";
-	header_output += "#define DCON_LUADLL_API\n";
-	header_output += "#endif\n";
 	header_output += "#endif\n";
 
 
@@ -661,18 +767,18 @@ int main(int argc, char *argv[]) {
 
 	//open new namespace
 	header_output += "\n";
-	header_output += "extern DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state;\n";
+	header_output += "extern DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state_ffi_ptr;\n";
 	header_output += "\n";
 
 	output += "\n";
-	output += "DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state;\n";
+	output += "DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state_ffi_ptr;\n";
 	output += "void (*release_object_function)(int32_t) = nullptr;\n";
 	output += "\n";
 
 	header_output += "extern \"C\" {\n";
 
-	header_output += "DCON_LUADLL_API void dcon_set_release_object_function(void (*fn)(int32_t));\n";
-	output += "void dcon_set_release_object_function(void (*fn)(int32_t)) {\n";
+	header_output += "DCON_LUADLL_API void " + project_prefix + "set_release_object_function(void (*fn)(int32_t));\n";
+	output += "void " + project_prefix + "set_release_object_function(void (*fn)(int32_t)) {\n";
 	output += "\trelease_object_function = fn;\n";
 	output += "}\n";
 
@@ -725,6 +831,52 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
 			lua_cdef_wrapper += "end\n";
 		};
+		auto append_id_to_id = [&](std::string property, std::string target) {
+			std::string head = id_to_id_head(ob.name, project_prefix, property);
+			header_output += "DCON_LUADLL_API " + head + ";\n";
+			output += head + id_to_id_body(parsed_file, ob.name, target, property);
+			lua_cdef += head + ";\n";
+			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
+			lua_cdef_wrapper += "---@return " + lua_id(target + "_id") + "\n";
+			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id)\n";
+			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
+			lua_cdef_wrapper += "end\n";
+		};
+		auto append_id_to_id_fat = [&](std::string property, std::string target) {
+			std::string head = id_to_id_head(ob.name, project_prefix, property);
+			header_output += "DCON_LUADLL_API " + head + ";\n";
+			output += head + id_to_id_fat_body(parsed_file, ob.name, target, property);
+			lua_cdef += head + ";\n";
+			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
+			lua_cdef_wrapper += "---@return " + lua_id(target + "_id") + "\n";
+			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id)\n";
+			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
+			lua_cdef_wrapper += "end\n";
+		};
+		auto append_id_index_to_id = [&](std::string property, std::string target_id) {
+			std::string head = id_index_to_id_head(ob.name, project_prefix, property);
+			header_output += "DCON_LUADLL_API " + head + ";\n";
+			output += head + id_index_to_id_body(parsed_file, ob.name, property);
+			lua_cdef += head + ";\n";
+			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
+			lua_cdef_wrapper += "---@param index number\n";
+			lua_cdef_wrapper += "---@return " + lua_id(target_id + + "_id") + "\n";
+			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id, index)\n";
+			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
+			lua_cdef_wrapper += "end\n";
+		};
+		auto append_id_index_id_to_void = [&](std::string property, std::string target_name) {
+			std::string head = id_index_id_to_void_head(ob.name, project_prefix, property);
+			header_output += "DCON_LUADLL_API " + head + ";\n";
+			output += head + id_index_id_to_void_body(parsed_file, ob.name, target_name, property);
+			lua_cdef += head + ";\n";
+			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
+			lua_cdef_wrapper += "---@param index number\n";
+			lua_cdef_wrapper += "---@param target_id " + lua_id(target_name + "_id") + "\n";
+			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id, index, target_id)\n";
+			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
+			lua_cdef_wrapper += "end\n";
+		};
 		auto append_void_to_value = [&](std::string property, std::string ctype, std::string luatype) {
 			std::string head = void_to_value_head(ob.name, project_prefix, property, ctype);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
@@ -748,7 +900,7 @@ int main(int argc, char *argv[]) {
 		auto append_id_value_to_void = [&](std::string property, std::string value_type, std::string value_luatype) {
 			std::string head = id_value_to_void_head(ob.name, project_prefix, property, value_type);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
-			output += head + id_to_void_body(parsed_file, ob.name, property);
+			output += head + id_value_to_void_body(parsed_file, ob.name, property);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
 			lua_cdef_wrapper += "---@param value " + value_luatype + "\n";
@@ -756,7 +908,7 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "\tffi.C." + access_property_name(ob.name, project_prefix, property) + "(id, value)\n";
 			lua_cdef_wrapper += "end\n";;
 		};
-		auto append_id_index_to_void = [&](std::string property, std::string index_name, std::string value_type, std::string value_luatype) {
+		auto append_id_index_to_void = [&](std::string property, std::string index_name) {
 			std::string head = id_index_to_void_head(ob.name, project_prefix, property);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
 			output += head + id_index_to_value_body(parsed_file, ob.name, index_name, property);
@@ -765,6 +917,17 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "---@param index " + lua_id(index_name) + "\n";
 			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id, index)\n";
 			lua_cdef_wrapper += "\tffi.C." + access_property_name(ob.name, project_prefix, property) + "(id, index)\n";
+			lua_cdef_wrapper += "end\n";;
+		};
+		auto append_id_id_to_void = [&](std::string property, std::string target_name) {
+			std::string head = id_id_to_void_head(ob.name, project_prefix, property);
+			header_output += "DCON_LUADLL_API " + head + ";\n";
+			output += head + id_id_to_void_body(parsed_file, ob.name, target_name, property);
+			lua_cdef += head + ";\n";
+			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
+			lua_cdef_wrapper += "---@param target_id " + lua_id(target_name + "_id") + "\n";
+			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id, target_id, value)\n";
+			lua_cdef_wrapper += "\tffi.C." + access_property_name(ob.name, project_prefix, property) + "(id, target_id, value)\n";
 			lua_cdef_wrapper += "end\n";;
 		};
 		auto append_id_index_to_value = [&](std::string property, std::string index_name, std::string value_type, std::string value_luatype) {
@@ -783,9 +946,9 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "end\n";;
 		};
 		auto append_id_index_value_to_void = [&](std::string property, std::string index_name, std::string value_type, std::string value_luatype) {
-			std::string head = id_index_to_value_head(ob.name, project_prefix, property, value_type);
+			std::string head = id_index_value_to_void_head(ob.name, project_prefix, property, value_type);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
-			output += head + id_index_to_value_body(parsed_file, ob.name, index_name, property);
+			output += head + id_index_value_to_void_body(parsed_file, ob.name, index_name, property);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
 			lua_cdef_wrapper += "---@param index " + lua_id(index_name) + "\n";
@@ -811,10 +974,18 @@ int main(int argc, char *argv[]) {
 
 		for(auto& prop : ob.properties) {
 			auto norm_property_type = normalize_type(prop.data_type, made_types);
-			if(prop.type == property_type::array_bitfield)
+
+			auto c_type = prop.data_type;
+			if(prop.type == property_type::array_bitfield) {
 				norm_property_type = lua_type_match::boolean;
-			if(prop.type == property_type::bitfield)
+				c_type = "bool";
+			}
+			if(prop.type == property_type::bitfield) {
 				norm_property_type = lua_type_match::boolean;
+				c_type = "bool";
+			}
+
+			auto lua_type = convert_lua_enum_to_type(norm_property_type);
 
 			if(prop.type == property_type::array_bitfield || prop.type == property_type::array_vectorizable || prop.type == property_type::array_other) {
 
@@ -822,22 +993,22 @@ int main(int argc, char *argv[]) {
 					case lua_type_match::integer:
 					case lua_type_match::floating_point:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_index_to_value("get_" + prop.name, prop.array_index_type, prop.data_type, "number");
-							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, prop.data_type, "number");
+							append_id_index_to_value("get_" + prop.name, prop.array_index_type, c_type, lua_type);
+							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, c_type, lua_type);
 						}
 						break;
 					case lua_type_match::boolean:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_index_to_value("get_" + prop.name, prop.array_index_type, "bool", "boolean");
-							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, "bool", "boolean");
+							append_id_index_to_value("get_" + prop.name, prop.array_index_type, c_type, lua_type);
+							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, c_type, lua_type);
 						}
 						break;
 					case lua_type_match::lua_object:
 						break;
 					case lua_type_match::handle_to_integer:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_index_to_value("get_" + prop.name, prop.array_index_type, "int32_t", lua_id(prop.data_type));
-							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, "int32_t", lua_id(prop.data_type));
+							append_id_index_to_id("get_" + prop.name, prop.data_type);
+							append_id_index_id_to_void("set_" + prop.name, prop.data_type);
 						}
 						break;
 					case lua_type_match::opaque:
@@ -850,12 +1021,12 @@ int main(int argc, char *argv[]) {
 				if(!prop.is_derived) {
 					header_output += "DCON_LUADLL_API uint32_t " + project_prefix + ob.name + "_get_" + prop.name + "_size(); \n";
 					output += "uint32_t " + project_prefix + ob.name + "_get_" + prop.name + "_size() { \n";
-					output += "\treturn state->" + ob.name + "_get_" + prop.name + "_size();\n";
+					output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "_size();\n";
 					output += "}\n";
 
 					header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(uint32_t sz); \n";
 					output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(uint32_t sz) { \n";
-					output += "\tstate->" + ob.name + "_resize_" + prop.name + "(sz);\n";
+					output += "\tstate_ffi_ptr->" + ob.name + "_resize_" + prop.name + "(sz);\n";
 					output += "}\n";
 				}
 
@@ -870,25 +1041,25 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API " + prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn state->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
+							output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v); \n";
 							output += "void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
+							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 						break;
@@ -897,25 +1068,25 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += "int32_t " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn state->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)).id.index();\n";
+							output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)).id.index();\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx, int32_t v); \n";
 							output += "void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx, int32_t v) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = " + parsed_file.namspace + "::" + prop.data_type + "{" + parsed_file.namspace + "::" + prop.data_type + "::value_base_t(v)};\n";
+							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = " + parsed_file.namspace + "::" + prop.data_type + "{" + parsed_file.namspace + "::" + prop.data_type + "::value_base_t(v)};\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 						break;
@@ -924,31 +1095,31 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API " + prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn state->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
+							output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v); \n";
 							output += "void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tauto old_val state->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
+							output += "\tauto old_val state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
 							output += "\tif(old_val) release_object_function(old_val);\n";
-							output += "\tstate->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
+							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tfor(auto j = state->" + ob.name + "_get_" + prop.name + "(index).size(); j --> uint32_t(sz); ) { \n";
-							output += "\t\tauto old_val state->" + ob.name + "_get_" + prop.name + "(index).at(j);\n";
+							output += "\tfor(auto j = state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size(); j --> uint32_t(sz); ) { \n";
+							output += "\t\tauto old_val state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(j);\n";
 							output += "\t\tif(old_val) release_object_function(old_val);\n";
 							output += "\t}\n";
-							output += "\tstate->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 					case lua_type_match::opaque:
@@ -956,19 +1127,19 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API " + prop.data_type + "* " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += prop.data_type + "* " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn &(state->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)));\n";
+							output += "\treturn &(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)));\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 						break;
@@ -978,23 +1149,22 @@ int main(int argc, char *argv[]) {
 					case lua_type_match::floating_point:
 					case lua_type_match::integer:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_to_value("get_" + prop.name, prop.data_type, "number");
-							append_id_value_to_void("set_" + prop.name, prop.data_type, "number");
+							append_id_to_value("get_" + prop.name, c_type, "number");
+							append_id_value_to_void("set_" + prop.name, c_type, "number");
 						}
 						break;
 					case lua_type_match::boolean:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_to_value("get_" + prop.name, prop.data_type, "boolean");
-							append_id_value_to_void("set_" + prop.name, prop.data_type, "boolean");
+							append_id_to_value("get_" + prop.name, c_type, "boolean");
+							append_id_value_to_void("set_" + prop.name, c_type, "boolean");
 						}
 						break;
 					case lua_type_match::lua_object:
 						break;
 					case lua_type_match::handle_to_integer:
-
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_to_value("get_" + prop.name, "int32_t", lua_id(prop.data_type));
-							append_id_value_to_void("set_" + prop.name, "int32_t", lua_id(prop.data_type));
+							append_id_to_id_fat("get_" + prop.name, prop.data_type);
+							append_id_id_to_void("set_" + prop.name, prop.data_type);
 						}
 						break;
 					case lua_type_match::opaque:
@@ -1009,61 +1179,18 @@ int main(int argc, char *argv[]) {
 
 		for(auto& indexed : ob.indexed_objects) {
 			if(indexed.index == index_type::at_most_one && ob.primary_key == indexed) {
-				header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + indexed.property_name + "(int32_t i); \n";
-				output += "int32_t " + project_prefix + ob.name + "_get_" + indexed.property_name + "(int32_t i) { \n";
-				output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-				output += "\treturn state->" + ob.name + "_get_" + indexed.property_name + "(index).index();\n";
-				output += "}\n";
-
-				header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + indexed.property_name + "(int32_t i, int32_t v); \n";
-				output += "void " + project_prefix + ob.name + "_set_" + indexed.property_name + "(int32_t i, int32_t v) { \n";
-				output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-				output += "\tstate->" + ob.name + "_set_" + indexed.property_name + "(index, " + parsed_file.namspace + "::" + indexed.type_name + "_id{" + parsed_file.namspace + "::" + indexed.type_name + "_id::value_base_t(v)});\n";
-				output += "}\n";
-
-				header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_try_set_" + indexed.property_name + "(int32_t i, int32_t v); \n";
-				output += "void " + project_prefix + ob.name + "_try_set_" + indexed.property_name + "(int32_t i, int32_t v) { \n";
-				output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-				output += "\tstate->" + ob.name + "_try_set_" + indexed.property_name + "(index, " + parsed_file.namspace + "::" + indexed.type_name + "_id{" + parsed_file.namspace + "::" + indexed.type_name + "_id::value_base_t(v)});\n";
-				output += "}\n";
-
+				append_id_to_id("get_" + indexed.property_name, indexed.type_name + "_id");
+				append_id_id_to_void("set_" + indexed.property_name, indexed.type_name + "_id");
+				append_id_id_to_void("try_set_" + indexed.property_name, indexed.type_name + "_id");
 			} else { // if(indexed.index == index_type::at_most_one ||  index_type::many || unindexed
 				if(indexed.multiplicity == 1) {
-					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + indexed.property_name + "(int32_t i); \n";
-					output += "int32_t " + project_prefix + ob.name + "_get_" + indexed.property_name + "(int32_t i) { \n";
-					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\treturn state->" + ob.name + "_get_" + indexed.property_name + "(index).index();\n";
-					output += "}\n";
-
-					header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + indexed.property_name + "(int32_t i, int32_t v); \n";
-					output += "void " + project_prefix + ob.name + "_set_" + indexed.property_name + "(int32_t i, int32_t v) { \n";
-					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tstate->" + ob.name + "_set_" + indexed.property_name + "(index, " + parsed_file.namspace + "::" + indexed.type_name + "_id{" + parsed_file.namspace + "::" + indexed.type_name + "_id::value_base_t(v)});\n";
-					output += "}\n";
-
-					header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_try_set_" + indexed.property_name + "(int32_t i, int32_t v); \n";
-					output += "void " + project_prefix + ob.name + "_try_set_" + indexed.property_name + "(int32_t i, int32_t v) { \n";
-					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tstate->" + ob.name + "_try_set_" + indexed.property_name + "(index, " + parsed_file.namspace + "::" + indexed.type_name + "_id{" + parsed_file.namspace + "::" + indexed.type_name + "_id::value_base_t(v)});\n";
-					output += "}\n";
+					append_id_to_id("get_" + indexed.property_name, indexed.type_name);
+					append_id_id_to_void("set_" + indexed.property_name, indexed.type_name + "_id");
+					append_id_id_to_void("try_set_" + indexed.property_name, indexed.type_name + "_id");
 				} else {
-					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + indexed.property_name + "(int32_t i, int32_t m); \n";
-					output += "int32_t " + project_prefix + ob.name + "_get_" + indexed.property_name + "(int32_t i, int32_t m) { \n";
-					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\treturn state->" + ob.name + "_get_" + indexed.property_name + "(index, m).index();\n";
-					output += "}\n";
-
-					header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + indexed.property_name + "(int32_t i, int32_t m, int32_t v); \n";
-					output += "void " + project_prefix + ob.name + "_set_" + indexed.property_name + "(int32_t i, int32_t m, int32_t v) { \n";
-					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tstate->" + ob.name + "_set_" + indexed.property_name + "(index, m, " + parsed_file.namspace + "::" + indexed.type_name + "_id{" + parsed_file.namspace + "::" + indexed.type_name + "_id::value_base_t(v)});\n";
-					output += "}\n";
-
-					header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_try_set_" + indexed.property_name + "(int32_t i, int32_t m, int32_t v); \n";
-					output += "void " + project_prefix + ob.name + "_try_set_" + indexed.property_name + "(int32_t i, int32_t m, int32_t v) { \n";
-					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tstate->" + ob.name + "_try_set_" + indexed.property_name + "(index, m, " + parsed_file.namspace + "::" + indexed.type_name + "_id{" + parsed_file.namspace + "::" + indexed.type_name + "_id::value_base_t(v)});\n";
-					output += "}\n";
+					append_id_index_to_id("get_" + indexed.property_name, indexed.type_name);
+					append_id_index_id_to_void("set_" + indexed.property_name, indexed.type_name);
+					append_id_index_id_to_void("try_set_" + indexed.property_name, indexed.type_name);
 				}
 			}
 		} // end: loop over indexed objects
@@ -1073,7 +1200,7 @@ int main(int argc, char *argv[]) {
 				header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i); \n";
 				output += "int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i) { \n";
 				output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-				output += "\treturn state->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index).index();\n";
+				output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index).index();\n";
 				output += "}\n";
 
 				bool is_only_of_type = true;
@@ -1085,7 +1212,7 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name  + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\treturn state->" + ob.name + "_get_" + involved_in.relation_name + "(index).index();\n";
+					output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "(index).index();\n";
 					output += "}\n";
 				} // end: is only of type
 
@@ -1094,14 +1221,14 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
 
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i, int32_t subindex); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i, int32_t subindex) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn rng.begin()[subindex].id.index();\n";
 					output += "}\n";
 				}
@@ -1116,14 +1243,14 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name  + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
 
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "(int32_t i, int32_t subindex); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "(int32_t i, int32_t subindex) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn rng.begin()[subindex].id.index();\n";
 					output += "}\n";
 				}
@@ -1134,60 +1261,60 @@ int main(int argc, char *argv[]) {
 
 		const std::string id_name = ob.name + "_id";
 		auto make_pop_back_delete = [&]() {
-			header_output += "DCON_LUADLL_API void dcon_pop_back_" + ob.name + "(); \n";
-			output += "void dcon_pop_back_" + ob.name + "() { \n";
-			output += "\tif(state->" + ob.name + "_size() > 0) {\n";
-			output += "\t\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(state->" + ob.name + "_size() - 1)};\n";
+			header_output += "DCON_LUADLL_API void " + project_prefix + "pop_back_" + ob.name + "(); \n";
+			output += "void " + project_prefix + "pop_back_" + ob.name + "() { \n";
+			output += "\tif(state_ffi_ptr->" + ob.name + "_size() > 0) {\n";
+			output += "\t\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(state_ffi_ptr->" + ob.name + "_size() - 1)};\n";
 			for(auto& p : ob.properties) {
 				if(p.data_type == "lua_reference_type") {
 					if(p.type == property_type::array_vectorizable || p.type == property_type::array_other) {
-						output += "\t\tfor(auto i = state->" + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
+						output += "\t\tfor(auto i = state_ffi_ptr->" + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
 						if(made_types.count(p.array_index_type) > 0) {
-							output += "\t\t\tif(auto result = state->" + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
 						} else {
-							output += "\t\t\tif(auto result = state->" + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
 						}
 						output += "\t\t}\n";
 					} else if(p.type == property_type::special_vector) {
 						output += "\t\t" + project_prefix + ob.name + "_resize_" + p.name + "(index.index(), 0);\n";
 					} else {
-						output += "\t\tif(auto result = state->" + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
+						output += "\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
 					}
 				}
 			}
-			output += "\t\tstate->pop_back_" + ob.name + "();\n";
+			output += "\t\tstate_ffi_ptr->pop_back_" + ob.name + "();\n";
 			output += "\t}\n";
 			output += "}\n";
 		};
 		auto make_simple_create = [&]() {
-			header_output += "DCON_LUADLL_API int32_t dcon_create_" + ob.name + "(); \n";
-			output += "int32_t dcon_create_" + ob.name + "() { \n";
-			output += "\tauto result = state->create_" + ob.name + "();\n";
+			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "create_" + ob.name + "(); \n";
+			output += "int32_t " + project_prefix + "create_" + ob.name + "() { \n";
+			output += "\tauto result = state_ffi_ptr->create_" + ob.name + "();\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 		};
 		auto make_delete = [&]() {
-			header_output += "DCON_LUADLL_API void dcon_delete_" + ob.name + "(int32_t j); \n";
-			output += "void dcon_delete_" + ob.name + "(int32_t j) { \n";
+			header_output += "DCON_LUADLL_API void " + project_prefix + "delete_" + ob.name + "(int32_t j); \n";
+			output += "void " + project_prefix + "delete_" + ob.name + "(int32_t j) { \n";
 			output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(j)};\n";
 			for(auto& p : ob.properties) {
 				if(p.data_type == "lua_reference_type") {
 					if(p.type == property_type::array_vectorizable || p.type == property_type::array_other) {
-						output += "\t\tfor(auto i = state->" + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
+						output += "\t\tfor(auto i = state_ffi_ptr->" + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
 						if(made_types.count(p.array_index_type) > 0) {
-							output += "\t\t\tif(auto result = state->" + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
 						} else {
-							output += "\t\t\tif(auto result = state->" + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
 						}
 						output += "\t\t}\n";
 					} else if(p.type == property_type::special_vector) {
 						output += "\t\t" + project_prefix + ob.name + "_resize_" + p.name + "(j, 0);\n";
 					} else {
-						output += "\t\tif(auto result = state->" + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
+						output += "\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
 					}
 				}
 			}
-			output += "\tstate->delete_" + ob.name + "(index);\n";
+			output += "\tstate_ffi_ptr->delete_" + ob.name + "(index);\n";
 			output += "}\n";
 		};
 		auto make_relation_create = [&]() {
@@ -1216,15 +1343,15 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			header_output += "DCON_LUADLL_API int32_t dcon_try_create_" + ob.name + "(" + pargs + "); \n";
-			output += "int32_t dcon_try_create_" + ob.name + "(" + pargs + ") { \n";
-			output += "\tauto result = state->try_create_" + ob.name + "(" + params + ");\n";
+			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "try_create_" + ob.name + "(" + pargs + "); \n";
+			output += "int32_t " + project_prefix + "try_create_" + ob.name + "(" + pargs + ") { \n";
+			output += "\tauto result = state_ffi_ptr->try_create_" + ob.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 
-			header_output += "DCON_LUADLL_API int32_t dcon_force_create_" + ob.name + "(" + pargs + "); \n";
-			output += "int32_t dcon_force_create_" + ob.name + "(" + pargs + ") { \n";
-			output += "\tauto result = state->force_create_" + ob.name + "(" + params + ");\n";
+			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "force_create_" + ob.name + "(" + pargs + "); \n";
+			output += "int32_t " + project_prefix + "force_create_" + ob.name + "(" + pargs + ") { \n";
+			output += "\tauto result = state_ffi_ptr->force_create_" + ob.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 		};
@@ -1285,9 +1412,9 @@ int main(int argc, char *argv[]) {
 				}
 			}
 
-			header_output += "DCON_LUADLL_API int32_t dcon_get_" + ob.name + "_by_" + cc.name + "(" + pargs +"); \n";
-			output += "int32_t dcon_get_" + ob.name + "_by_" + cc.name + "(" + pargs + ") { \n";
-			output += "\tauto result = state->get_" + ob.name + "_by_" + cc.name + "(" + params + ");\n";
+			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "get_" + ob.name + "_by_" + cc.name + "(" + pargs +"); \n";
+			output += "int32_t " + project_prefix + "get_" + ob.name + "_by_" + cc.name + "(" + pargs + ") { \n";
+			output += "\tauto result = state_ffi_ptr->get_" + ob.name + "_by_" + cc.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 
@@ -1311,9 +1438,9 @@ int main(int argc, char *argv[]) {
 	output += "\n";
 	//reset function
 
-	header_output += "DCON_LUADLL_API int32_t dcon_reset(); \n";
-	output += "int32_t dcon_reset() { \n";
-	output += "\tstate->reset();\n";
+	header_output += "DCON_LUADLL_API int32_t " + project_prefix + "reset(); \n";
+	output += "int32_t " + project_prefix + "reset() { \n";
+	output += "\tstate_ffi_ptr->reset();\n";
 	output += "\treturn 0;\n";
 	output += "}\n";
 
@@ -1322,11 +1449,11 @@ int main(int argc, char *argv[]) {
 		header_output += "DCON_LUADLL_API void " + project_prefix + rt.name + "_write_file(char const* name); \n";
 		output += "void " + project_prefix + rt.name + "_write_file(char const* name) { \n";
 		output += "\tstd::ofstream file_out(name, std::ios::binary);\n";
-		output += "\t"+ parsed_file.namspace + "::load_record selection = state->make_serialize_record_" + rt.name + "();\n";
-		output += "\tauto sz = state->serialize_size(selection);\n";
+		output += "\t"+ parsed_file.namspace + "::load_record selection = state_ffi_ptr->make_serialize_record_" + rt.name + "();\n";
+		output += "\tauto sz = state_ffi_ptr->serialize_size(selection);\n";
 		output += "\tstd::byte* temp_buffer = new std::byte[sz];\n";
 		output += "\tauto ptr = temp_buffer;\n";
-		output += "\tstate->serialize(ptr, selection); \n";
+		output += "\tstate_ffi_ptr->serialize(ptr, selection); \n";
 		output += "\tfile_out.write((char*)temp_buffer, sz);\n";
 		output += "\tdelete[] temp_buffer;\n";
 		output += "}\n";
@@ -1343,8 +1470,8 @@ int main(int argc, char *argv[]) {
 		output += "\tvec.insert(vec.begin(), std::istream_iterator<unsigned char>(file_in),  std::istream_iterator<unsigned char>());\n";
 		output += "\tstd::byte const* ptr = (std::byte const*)(vec.data());\n";
 		output += "\t" + parsed_file.namspace + "::load_record loaded;\n";
-		output += "\t" + parsed_file.namspace + "::load_record selection = state->make_serialize_record_" + rt.name + "();\n";
-		output += "\tstate->deserialize(ptr, ptr + sz, loaded, selection); \n";
+		output += "\t" + parsed_file.namspace + "::load_record selection = state_ffi_ptr->make_serialize_record_" + rt.name + "();\n";
+		output += "\tstate_ffi_ptr->deserialize(ptr, ptr + sz, loaded, selection); \n";
 		output += "}\n";
 	}
 
