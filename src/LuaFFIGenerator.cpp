@@ -799,8 +799,6 @@ int main(int argc, char *argv[]) {
 
 		std::string lua_cdef = 	"-- GENERATED FILE: DO NOT EDIT --\n";
 		lua_cdef +=		"--   PROVIDES FFI DECLARATIONS --\n";
-		lua_cdef +=		"--      REQUIRED VIA MANAGER   --\n";
-		lua_cdef += 		"--    DO NOT REQUIRE DIRECTLY  --\n";
 
 
 		// lua_meta += "--@meta\n";
