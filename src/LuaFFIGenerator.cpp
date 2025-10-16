@@ -171,7 +171,7 @@ std::string access_property_name(
 std::string access_core_property_name(
 	std::string object_name, std::string property
 ) {
-	return "state_ffi_ptr->" + object_name + "_" + property;
+	return "game_state." + object_name + "_" + property;
 }
 
 std::string id_to_value_body(
@@ -767,11 +767,11 @@ int main(int argc, char *argv[]) {
 
 	//open new namespace
 	header_output += "\n";
-	header_output += "extern DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state_ffi_ptr;\n";
+	header_output += "extern DCON_LUADLL_API " + parsed_file.namspace + "::data_container game_state;\n";
 	header_output += "\n";
 
 	output += "\n";
-	output += "DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state_ffi_ptr;\n";
+	// output += "DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state_ffi_ptr;\n";
 	output += "void (*release_object_function)(int32_t) = nullptr;\n";
 	output += "\n";
 
@@ -1019,12 +1019,12 @@ int main(int argc, char *argv[]) {
 				if(!prop.is_derived) {
 					header_output += "DCON_LUADLL_API uint32_t " + project_prefix + ob.name + "_get_" + prop.name + "_size(); \n";
 					output += "uint32_t " + project_prefix + ob.name + "_get_" + prop.name + "_size() { \n";
-					output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "_size();\n";
+					output += "\treturn game_state." + ob.name + "_get_" + prop.name + "_size();\n";
 					output += "}\n";
 
 					header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(uint32_t sz); \n";
 					output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(uint32_t sz) { \n";
-					output += "\tstate_ffi_ptr->" + ob.name + "_resize_" + prop.name + "(sz);\n";
+					output += "\tgame_state." + ob.name + "_resize_" + prop.name + "(sz);\n";
 					output += "}\n";
 				}
 
@@ -1039,25 +1039,25 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API " + prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
+							output += "\treturn game_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(game_state." + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v); \n";
 							output += "void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
+							output += "\tgame_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tgame_state." + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 						break;
@@ -1066,25 +1066,25 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += "int32_t " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)).id.index();\n";
+							output += "\treturn game_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)).id.index();\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(game_state." + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx, int32_t v); \n";
 							output += "void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx, int32_t v) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = " + parsed_file.namspace + "::" + prop.data_type + "{" + parsed_file.namspace + "::" + prop.data_type + "::value_base_t(v)};\n";
+							output += "\tgame_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = " + parsed_file.namspace + "::" + prop.data_type + "{" + parsed_file.namspace + "::" + prop.data_type + "::value_base_t(v)};\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tgame_state." + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 						break;
@@ -1093,31 +1093,31 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API " + prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
+							output += "\treturn game_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(game_state." + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v); \n";
 							output += "void " + project_prefix + ob.name + "_set_" + prop.name + "(int32_t i, int32_t idx," + prop.data_type + " v) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tauto old_val state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
+							output += "\tauto old_val game_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx));\n";
 							output += "\tif(old_val) release_object_function(old_val);\n";
-							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
+							output += "\tgame_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)) = v;\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tfor(auto j = state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size(); j --> uint32_t(sz); ) { \n";
-							output += "\t\tauto old_val state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(j);\n";
+							output += "\tfor(auto j = game_state." + ob.name + "_get_" + prop.name + "(index).size(); j --> uint32_t(sz); ) { \n";
+							output += "\t\tauto old_val game_state." + ob.name + "_get_" + prop.name + "(index).at(j);\n";
 							output += "\t\tif(old_val) release_object_function(old_val);\n";
 							output += "\t}\n";
-							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tgame_state." + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 					case lua_type_match::opaque:
@@ -1125,19 +1125,19 @@ int main(int argc, char *argv[]) {
 							header_output += "DCON_LUADLL_API " + prop.data_type + "* " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += prop.data_type + "* " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn &(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)));\n";
+							output += "\treturn &(game_state." + ob.name + "_get_" + prop.name + "(index).at(uint32_t(idx)));\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i); \n";
 							output += "int32_t " + project_prefix + ob.name + "_size_" + prop.name + "(int32_t i) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\treturn int32_t(state_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).size());\n";
+							output += "\treturn int32_t(game_state." + ob.name + "_get_" + prop.name + "(index).size());\n";
 							output += "}\n";
 
 							header_output += "DCON_LUADLL_API void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz); \n";
 							output += "void " + project_prefix + ob.name + "_resize_" + prop.name + "(int32_t i, int32_t sz) { \n";
 							output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-							output += "\tstate_ffi_ptr->" + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
+							output += "\tgame_state." + ob.name + "_get_" + prop.name + "(index).resize(uint32_t(sz));\n";
 							output += "}\n";
 						}
 						break;
@@ -1198,7 +1198,7 @@ int main(int argc, char *argv[]) {
 				header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i); \n";
 				output += "int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i) { \n";
 				output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-				output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index).index();\n";
+				output += "\treturn game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index).index();\n";
 				output += "}\n";
 
 				bool is_only_of_type = true;
@@ -1210,7 +1210,7 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_" + involved_in.relation_name  + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\treturn state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "(index).index();\n";
+					output += "\treturn game_state." + ob.name + "_get_" + involved_in.relation_name + "(index).index();\n";
 					output += "}\n";
 				} // end: is only of type
 
@@ -1219,14 +1219,14 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
 
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i, int32_t subindex); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(int32_t i, int32_t subindex) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn rng.begin()[subindex].id.index();\n";
 					output += "}\n";
 				}
@@ -1241,14 +1241,14 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name  + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
 
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "(int32_t i, int32_t subindex); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "(int32_t i, int32_t subindex) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = state_ffi_ptr->" + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn rng.begin()[subindex].id.index();\n";
 					output += "}\n";
 				}
@@ -1261,33 +1261,33 @@ int main(int argc, char *argv[]) {
 		auto make_pop_back_delete = [&]() {
 			header_output += "DCON_LUADLL_API void " + project_prefix + "pop_back_" + ob.name + "(); \n";
 			output += "void " + project_prefix + "pop_back_" + ob.name + "() { \n";
-			output += "\tif(state_ffi_ptr->" + ob.name + "_size() > 0) {\n";
-			output += "\t\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(state_ffi_ptr->" + ob.name + "_size() - 1)};\n";
+			output += "\tif(game_state." + ob.name + "_size() > 0) {\n";
+			output += "\t\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(game_state." + ob.name + "_size() - 1)};\n";
 			for(auto& p : ob.properties) {
 				if(p.data_type == "lua_reference_type") {
 					if(p.type == property_type::array_vectorizable || p.type == property_type::array_other) {
-						output += "\t\tfor(auto i = state_ffi_ptr->" + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
+						output += "\t\tfor(auto i = game_state." + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
 						if(made_types.count(p.array_index_type) > 0) {
-							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
 						} else {
-							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
 						}
 						output += "\t\t}\n";
 					} else if(p.type == property_type::special_vector) {
 						output += "\t\t" + project_prefix + ob.name + "_resize_" + p.name + "(index.index(), 0);\n";
 					} else {
-						output += "\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
+						output += "\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
 					}
 				}
 			}
-			output += "\t\tstate_ffi_ptr->pop_back_" + ob.name + "();\n";
+			output += "\t\tgame_state.pop_back_" + ob.name + "();\n";
 			output += "\t}\n";
 			output += "}\n";
 		};
 		auto make_simple_create = [&]() {
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "create_" + ob.name + "(); \n";
 			output += "int32_t " + project_prefix + "create_" + ob.name + "() { \n";
-			output += "\tauto result = state_ffi_ptr->create_" + ob.name + "();\n";
+			output += "\tauto result = game_state.create_" + ob.name + "();\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 		};
@@ -1298,21 +1298,21 @@ int main(int argc, char *argv[]) {
 			for(auto& p : ob.properties) {
 				if(p.data_type == "lua_reference_type") {
 					if(p.type == property_type::array_vectorizable || p.type == property_type::array_other) {
-						output += "\t\tfor(auto i = state_ffi_ptr->" + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
+						output += "\t\tfor(auto i = game_state." + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
 						if(made_types.count(p.array_index_type) > 0) {
-							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
 						} else {
-							output += "\t\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
 						}
 						output += "\t\t}\n";
 					} else if(p.type == property_type::special_vector) {
 						output += "\t\t" + project_prefix + ob.name + "_resize_" + p.name + "(j, 0);\n";
 					} else {
-						output += "\t\tif(auto result = state_ffi_ptr->" + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
+						output += "\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
 					}
 				}
 			}
-			output += "\tstate_ffi_ptr->delete_" + ob.name + "(index);\n";
+			output += "\tgame_state.delete_" + ob.name + "(index);\n";
 			output += "}\n";
 		};
 		auto make_relation_create = [&]() {
@@ -1343,13 +1343,13 @@ int main(int argc, char *argv[]) {
 
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "try_create_" + ob.name + "(" + pargs + "); \n";
 			output += "int32_t " + project_prefix + "try_create_" + ob.name + "(" + pargs + ") { \n";
-			output += "\tauto result = state_ffi_ptr->try_create_" + ob.name + "(" + params + ");\n";
+			output += "\tauto result = game_state.try_create_" + ob.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "force_create_" + ob.name + "(" + pargs + "); \n";
 			output += "int32_t " + project_prefix + "force_create_" + ob.name + "(" + pargs + ") { \n";
-			output += "\tauto result = state_ffi_ptr->force_create_" + ob.name + "(" + params + ");\n";
+			output += "\tauto result = game_state.force_create_" + ob.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 		};
@@ -1412,7 +1412,7 @@ int main(int argc, char *argv[]) {
 
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "get_" + ob.name + "_by_" + cc.name + "(" + pargs +"); \n";
 			output += "int32_t " + project_prefix + "get_" + ob.name + "_by_" + cc.name + "(" + pargs + ") { \n";
-			output += "\tauto result = state_ffi_ptr->get_" + ob.name + "_by_" + cc.name + "(" + params + ");\n";
+			output += "\tauto result = game_state.get_" + ob.name + "_by_" + cc.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 
@@ -1438,7 +1438,7 @@ int main(int argc, char *argv[]) {
 
 	header_output += "DCON_LUADLL_API int32_t " + project_prefix + "reset(); \n";
 	output += "int32_t " + project_prefix + "reset() { \n";
-	output += "\tstate_ffi_ptr->reset();\n";
+	output += "\tgame_state.reset();\n";
 	output += "\treturn 0;\n";
 	output += "}\n";
 
@@ -1447,11 +1447,11 @@ int main(int argc, char *argv[]) {
 		header_output += "DCON_LUADLL_API void " + project_prefix + rt.name + "_write_file(char const* name); \n";
 		output += "void " + project_prefix + rt.name + "_write_file(char const* name) { \n";
 		output += "\tstd::ofstream file_out(name, std::ios::binary);\n";
-		output += "\t"+ parsed_file.namspace + "::load_record selection = state_ffi_ptr->make_serialize_record_" + rt.name + "();\n";
-		output += "\tauto sz = state_ffi_ptr->serialize_size(selection);\n";
+		output += "\t"+ parsed_file.namspace + "::load_record selection = game_state.make_serialize_record_" + rt.name + "();\n";
+		output += "\tauto sz = game_state.serialize_size(selection);\n";
 		output += "\tstd::byte* temp_buffer = new std::byte[sz];\n";
 		output += "\tauto ptr = temp_buffer;\n";
-		output += "\tstate_ffi_ptr->serialize(ptr, selection); \n";
+		output += "\tgame_state.serialize(ptr, selection); \n";
 		output += "\tfile_out.write((char*)temp_buffer, sz);\n";
 		output += "\tdelete[] temp_buffer;\n";
 		output += "}\n";
@@ -1468,8 +1468,8 @@ int main(int argc, char *argv[]) {
 		output += "\tvec.insert(vec.begin(), std::istream_iterator<unsigned char>(file_in),  std::istream_iterator<unsigned char>());\n";
 		output += "\tstd::byte const* ptr = (std::byte const*)(vec.data());\n";
 		output += "\t" + parsed_file.namspace + "::load_record loaded;\n";
-		output += "\t" + parsed_file.namspace + "::load_record selection = state_ffi_ptr->make_serialize_record_" + rt.name + "();\n";
-		output += "\tstate_ffi_ptr->deserialize(ptr, ptr + sz, loaded, selection); \n";
+		output += "\t" + parsed_file.namspace + "::load_record selection = game_state.make_serialize_record_" + rt.name + "();\n";
+		output += "\tgame_state.deserialize(ptr, ptr + sz, loaded, selection); \n";
 		output += "}\n";
 	}
 
