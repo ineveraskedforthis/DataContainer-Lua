@@ -1143,8 +1143,8 @@ int main(int argc, char *argv[]) {
 					);
 					append(
 						gen_call_information(
-							"size_" + prop.name,
-							array_access::at_call,
+							"get_" + prop.name,
+							array_access::size_call,
 							{
 								id_in
 							},
@@ -1153,8 +1153,8 @@ int main(int argc, char *argv[]) {
 					);
 					append(
 						gen_call_information(
-							"resize_" + prop.name,
-							array_access::at_call,
+							"get_" + prop.name,
+							array_access::resize_call,
 							{
 								id_in, size_type
 							},
