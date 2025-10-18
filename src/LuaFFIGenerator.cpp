@@ -259,7 +259,7 @@ struct arg_information {
 	std::string name;
 };
 
-arg_information normalize_argument(std::string name, std::string& declared_type) {
+arg_information normalize_argument(std::string name, bool is_bool, std::string& declared_type) {
 	if (made_types.count(declared_type) + made_types.count(declared_type + "_id") > 0) {
 		return {
 			meta_information::id,
@@ -267,11 +267,22 @@ arg_information normalize_argument(std::string name, std::string& declared_type)
 			name
 		};
 	} else {
-		return {
+		arg_information arg {
 			meta_information::value,
 			normalize_type(declared_type, made_types),
 			name
 		};
+		if (is_bool) {
+			arg.type.normalized = lua_type_match::boolean;
+			arg.type.c_type = "bool";
+			arg.type.lua_type = "boolean";
+			arg.type.api_type = "bool";
+		}
+		if (arg.type.normalized == lua_type_match::opaque) {
+			// assert(false);
+			arg.meta_type = meta_information::value_pointer;
+		};
+		return arg;
 	}
 }
 
@@ -373,9 +384,10 @@ auto generate_body(file_def& file, function_call_information desc) {
 				result += convert_raw_to_id_from_id(file, item.type.c_type, api_arg_string(item, counter));
 			} else if (item.meta_type == meta_information::value) {
 				result += api_arg_string(item, counter);
+			} else if (item.meta_type == meta_information::value_pointer) {
+				result += "&" + api_arg_string(item, counter);
 			} else {
-				// not implemented
-				assert(false);
+				assert("false");
 			}
 			result += ";\n";
 			counter++;
@@ -1082,20 +1094,9 @@ int main(int argc, char *argv[]) {
 		append(gen_call_information("resize", array_access::function_call, {size_type}, void_type));
 
 		for(auto& prop : ob.properties) {
-			arg_information value = normalize_argument("value", prop.data_type);
-			if(prop.type == property_type::array_bitfield) {
-				value.type.normalized = lua_type_match::boolean;
-				value.type.c_type = "bool";
-				value.type.lua_type = "boolean";
-				value.type.api_type = "bool";
-			}
-			if(prop.type == property_type::bitfield) {
-				value.type.normalized = lua_type_match::boolean;
-				value.type.c_type = "bool";
-				value.type.lua_type = "boolean";
-				value.type.api_type = "bool";
-			}
-			auto index = normalize_argument("index", prop.array_index_type);
+			auto is_bool = prop.type == property_type::array_bitfield || prop.type == property_type::bitfield;
+			arg_information value = normalize_argument("value", is_bool, prop.data_type);
+			auto index = normalize_argument("index", false, prop.array_index_type);
 
 			if(prop.type == property_type::array_bitfield || prop.type == property_type::array_vectorizable || prop.type == property_type::array_other) {
 				if((prop.hook_get || !prop.is_derived) && value.type.normalized != lua_type_match::lua_object) {
