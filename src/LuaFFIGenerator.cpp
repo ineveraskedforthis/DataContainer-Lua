@@ -457,6 +457,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 				result += " result = ";
 				result += access_string + ";\n";
 				result += "\treturn result.index();\n";
+				break;
 			}
 			case meta_information::value: {
 				result += "return " + access_string + ";\n";
@@ -1137,7 +1138,7 @@ int main(int argc, char *argv[]) {
 							array_access::at_call,
 							{
 								id_in,
-								index
+								size_type
 							},
 							value
 						)
@@ -1168,7 +1169,7 @@ int main(int argc, char *argv[]) {
 							array_access::at_call,
 							{
 								id_in,
-								index,
+								size_type,
 								value
 							},
 							void_type
