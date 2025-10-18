@@ -209,6 +209,7 @@ std::string declare_id_from_raw_id (std::string indent, file_def& file, std::str
 }
 
 std::string declare_index_from_raw (std::string indent, file_def& file, std::string index_type, std::string raw_index, std::string index) {
+
 	return indent + "auto " + index + " = " + convert_raw_to_index(file, index_type, raw_index) + ";\n";
 }
 
@@ -240,13 +241,14 @@ std::string id_to_value_body(
 
 
 std::string id_index_to_id_body(
-	file_def& file, std::string object_name, std::string property, std::string target_id
+	file_def& file, std::string object_name, std::string index_type, std::string property, std::string target_id
 ) {
 	std::string generated = "";
 	generated += "{\n";
 
 	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\tdcon::" + target_id + " result = " + access_core_property_name(object_name, property) + "(true_id, index);\n";
+	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
+	generated += "\tdcon::" + target_id + " result = " + access_core_property_name(object_name, property) + "(true_id, true_index);\n";
 	generated += "\treturn result.index();\n";
 
 	generated += "}\n";
@@ -254,14 +256,15 @@ std::string id_index_to_id_body(
 }
 
 std::string id_index_id_to_void_body(
-	file_def& file, std::string object_name, std::string target_id_name, std::string property
+	file_def& file, std::string object_name, std::string index_type, std::string target_id_name, std::string property
 ) {
 	std::string generated = "";
 	generated += "{\n";
 
 	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
+	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
 	generated += declare_id_from_raw_id("\t", file, target_id_name, "raw_target_id", "true_target_id");
-	generated += "\t" + access_core_property_name(object_name, property) + "(true_id, index, true_target_id);\n";
+	generated += "\t" + access_core_property_name(object_name, property) + "(true_id, true_index, true_target_id);\n";
 	generated += "}\n";
 	return generated;
 }
@@ -404,13 +407,13 @@ std::string id_id_to_void_head(
 std::string id_index_to_id_head(
 	std::string object, std::string project_prefix, std::string property
 ) {
-	return "int32_t " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t index)";
+	return "int32_t " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
 }
 
 std::string id_index_id_to_void_head(
 	std::string object, std::string project_prefix, std::string property
 ) {
-	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t index, int32_t raw_target_id)";
+	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index, int32_t raw_target_id)";
 }
 
 std::string void_to_value_head(
@@ -423,7 +426,7 @@ std::string id_index_to_value_head(
 	std::string object, std::string project_prefix, std::string property,
 	std::string property_type, std::string index_type
 ) {
-	return property_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, " + index_type + " index)";
+	return property_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, " + index_type + " raw_index)";
 }
 
 std::string id_to_void_head(
@@ -542,9 +545,10 @@ std::string to_luatype(
 std::string convert_to_id(std::string in) {
 	if (made_types.count(in) > 0) {
 		return in;
-	} else {
+	} else if (made_types.count(in + "_id") > 0) {
 		return in + "_id";
 	}
+	return in;
 }
 
 int main(int argc, char *argv[]) {
@@ -913,27 +917,39 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
 			lua_cdef_wrapper += "end\n";
 		};
-		auto append_id_index_to_id = [&](std::string property, std::string target_id_name) {
+		auto append_id_index_to_id = [&](std::string property, std::string index_id_name, std::string target_id_name) {
 			target_id_name = convert_to_id(target_id_name);
+			index_id_name = convert_to_id(index_id_name);
 			std::string head = id_index_to_id_head(ob.name, project_prefix, property);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
-			output += head + id_index_to_id_body(parsed_file, ob.name, property, target_id_name);
+			output += head + id_index_to_id_body(parsed_file, ob.name, index_id_name, property, target_id_name);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
-			lua_cdef_wrapper += "---@param index number\n";
+			auto normal_type = normalize_type(parsed_file, index_id_name, made_types);
+			if (normal_type.normalized == lua_type_match::handle_to_integer) {
+				lua_cdef_wrapper += "---@param index " + lua_id(index_id_name) + "\n";
+			} else {
+				lua_cdef_wrapper += "---@param index number\n";
+			}
 			lua_cdef_wrapper += "---@return " + lua_id(target_id_name) + "\n";
 			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id, index)\n";
 			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
 			lua_cdef_wrapper += "end\n";
 		};
-		auto append_id_index_id_to_void = [&](std::string property, std::string target_id_name) {
+		auto append_id_index_id_to_void = [&](std::string property, std::string index_id_name, std::string target_id_name) {
 			target_id_name = convert_to_id(target_id_name);
+			index_id_name = convert_to_id(index_id_name);
 			std::string head = id_index_id_to_void_head(ob.name, project_prefix, property);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
-			output += head + id_index_id_to_void_body(parsed_file, ob.name, target_id_name, property);
+			output += head + id_index_id_to_void_body(parsed_file, ob.name, index_id_name, target_id_name, property);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
-			lua_cdef_wrapper += "---@param index number\n";
+			auto normal_type = normalize_type(parsed_file, index_id_name, made_types);
+			if (normal_type.normalized == lua_type_match::handle_to_integer) {
+				lua_cdef_wrapper += "---@param index " + lua_id(index_id_name) + "\n";
+			} else {
+				lua_cdef_wrapper += "---@param index number\n";
+			}
 			lua_cdef_wrapper += "---@param target_id " + lua_id(target_id_name) + "\n";
 			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id, index, target_id)\n";
 			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
@@ -1018,12 +1034,12 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "end\n";;
 		};
 		auto append_id_index_value_to_void = [&](std::string property, std::string index_type, std::string value_type, std::string value_luatype) {
+			auto normal_type = normalize_type(parsed_file, index_type, made_types);
 			std::string head = id_index_value_to_void_head(ob.name, project_prefix, property, value_type);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
 			output += head + id_index_value_to_void_body(parsed_file, ob.name, index_type, property);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
-			auto normal_type = normalize_type(parsed_file, index_type, made_types);
 			if (normal_type.normalized == lua_type_match::handle_to_integer) {
 				lua_cdef_wrapper += "---@param index " + lua_id(index_type) + "\n";
 			} else {
@@ -1080,8 +1096,8 @@ int main(int argc, char *argv[]) {
 						break;
 					case lua_type_match::handle_to_integer:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_index_to_id("get_" + prop.name, prop.data_type);
-							append_id_index_id_to_void("set_" + prop.name, prop.data_type);
+							append_id_index_to_id("get_" + prop.name, prop.array_index_type, prop.data_type);
+							append_id_index_id_to_void("set_" + prop.name, prop.array_index_type, prop.data_type);
 						}
 						break;
 					case lua_type_match::opaque:
@@ -1258,9 +1274,9 @@ int main(int argc, char *argv[]) {
 					append_id_id_to_void("set_" + indexed.property_name, indexed.type_name + "_id");
 					append_id_id_to_void("try_set_" + indexed.property_name, indexed.type_name + "_id");
 				} else {
-					append_id_index_to_id("get_" + indexed.property_name, indexed.type_name);
-					append_id_index_id_to_void("set_" + indexed.property_name, indexed.type_name);
-					append_id_index_id_to_void("try_set_" + indexed.property_name, indexed.type_name);
+					append_id_index_to_id("get_" + indexed.property_name, "int32_t", indexed.type_name);
+					append_id_index_id_to_void("set_" + indexed.property_name, "int32_t", indexed.type_name);
+					append_id_index_id_to_void("try_set_" + indexed.property_name, "int32_t", indexed.type_name);
 				}
 			}
 		} // end: loop over indexed objects
