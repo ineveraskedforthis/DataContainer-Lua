@@ -120,9 +120,9 @@ std::string convert_to_id(std::string in) {
 	return in;
 }
 
-combotype normalize_type(file_def& file, std::string const& in, std::set<std::string> const& made_types);
+combotype normalize_type(std::string const& in, std::set<std::string> const& made_types);
 
-combotype normalize_type(file_def& file, std::string const& in, std::set<std::string> const& made_types) {
+combotype normalize_type(std::string const& in, std::set<std::string> const& made_types) {
 	if (
 		in == "char"
 		|| in == "unsigned char"
@@ -210,7 +210,7 @@ std::string convert_raw_to_id_from_id (file_def& file, std::string id_type_name,
 }
 
 std::string convert_raw_to_index (file_def& file, std::string index_type, std::string raw_index) {
-	auto norm_index_type = normalize_type(file, index_type, made_types);
+	auto norm_index_type = normalize_type(index_type, made_types);
 	std::string index_access_string;
 	if(norm_index_type.normalized == lua_type_match::handle_to_integer) {
 		index_access_string = convert_raw_to_id_from_id(file, index_type, raw_index);
@@ -245,193 +245,6 @@ std::string access_core_property_name(
 	return "game_state." + object_name + "_" + property;
 }
 
-std::string id_to_value_body(
-	file_def& file, std::string object_name, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\tauto result = " + access_core_property_name(object_name, property) + "(true_id);\n";
-	generated += "\treturn result;\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_to_value_pointer_body(
-	file_def& file, std::string object_name, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\treturn &" + access_core_property_name(object_name, property) + "(true_id);\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-
-std::string id_index_to_id_body(
-	file_def& file, std::string object_name, std::string index_type, std::string property, std::string target_id
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
-	generated += "\tdcon::" + target_id + " result = " + access_core_property_name(object_name, property) + "(true_id, true_index);\n";
-	generated += "\treturn result.index();\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_index_id_to_void_body(
-	file_def& file, std::string object_name, std::string index_type, std::string target_id_name, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
-	generated += declare_id_from_raw_id("\t", file, target_id_name, "raw_target_id", "true_target_id");
-	generated += "\t" + access_core_property_name(object_name, property) + "(true_id, true_index, true_target_id);\n";
-	generated += "}\n";
-	return generated;
-}
-
-std::string value_to_void_body(
-	file_def& file, std::string object_name, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-	generated += "\t" + access_core_property_name(object_name, property) + "(value);\n";
-	generated += "}\n";
-	return generated;
-}
-
-std::string void_to_value_body(
-	file_def& file, std::string object_name, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += "\tauto result = " + access_core_property_name(object_name, property) + "();";
-	generated += "\treturn result;\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_to_void_body(
-	file_def& file, std::string object_name, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\t" + access_core_property_name(object_name, property) + "(true_id);\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_value_to_void_body(
-	file_def& file, std::string object_name, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\t" + access_core_property_name(object_name, property) + "(true_id, value);\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_index_to_value_body(
-	file_def& file, std::string object_name, std::string index_type, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
-	generated += "\treturn " + access_core_property_name(object_name, property) + "(true_id, true_index);\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_index_to_value_pointer_body(
-	file_def& file, std::string object_name, std::string index_type, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name + "*", "raw_id", "true_id");
-	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
-	generated += "\treturn &" + access_core_property_name(object_name, property) + "(true_id, true_index);\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_to_id_body(
-	file_def& file, std::string object_name, std::string target_type, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\tdcon::" + target_type + " result = " + access_core_property_name(object_name, property) + "(true_id);";
-	generated += "\treturn result.index();\n";
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_to_id_fat_body(
-	file_def& file, std::string object_name, std::string target_type, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\tdcon::" + target_type + " result = " + access_core_property_name(object_name, property) + "(true_id);\n";
-	generated += "\treturn result.index();\n";
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_id_to_void_body(
-	file_def& file, std::string object_name, std::string target_type, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += declare_id_from_raw_id("\t", file, target_type, "raw_target_id", "true_target_id");
-	generated +=  "\t" + access_core_property_name(object_name, property) + "(true_id, true_target_id);\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-std::string id_index_value_to_void_body(
-	file_def& file, std::string object_name, std::string index_type, std::string property
-) {
-	std::string generated = "";
-	generated += "{\n";
-
-	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
-	generated +=  "\t" + access_core_property_name(object_name, property) + "(true_id, true_index, value);\n";
-
-	generated += "}\n";
-	return generated;
-}
-
-
 enum class meta_information {
 	id, value, value_pointer, empty
 };
@@ -446,17 +259,17 @@ struct arg_information {
 	std::string name;
 };
 
-arg_information normalize_argument(file_def &file, std::string name, std::string& declared_type) {
+arg_information normalize_argument(std::string name, std::string& declared_type) {
 	if (made_types.count(declared_type) + made_types.count(declared_type + "_id") > 0) {
 		return {
 			meta_information::id,
-			normalize_type(file, declared_type, made_types),
+			normalize_type(declared_type, made_types),
 			name
 		};
 	} else {
 		return {
 			meta_information::value,
-			normalize_type(file, declared_type, made_types),
+			normalize_type(declared_type, made_types),
 			name
 		};
 	}
@@ -573,7 +386,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 	if (desc.access_type == array_access::function_call) {
 		std::string call = access_core_property_name(desc.accessed_object, desc.accessed_property);
 		std::string args = "";
-		for (int i = 0; i < desc.in.size(); i++) {
+		for (size_t i = 0; i < desc.in.size(); i++) {
 			args += container_arg_string(desc.in[i], i);
 			if (i + 1 < desc.in.size()) {
 				args += ", ";
@@ -813,7 +626,7 @@ std::string to_luatype(
 	}
 
 	auto flat_name = def.data_type;
-	for (int i = 0; i < flat_name.length(); i++) {
+	for (size_t i = 0; i < flat_name.length(); i++) {
 		if (flat_name[i] == ':') {
 			flat_name[i] = '_';
 		}
@@ -996,12 +809,12 @@ int main(int argc, char *argv[]) {
 
 
 	// patch up composite key info
-	bool needs_hash_include = false;
+	// bool needs_hash_include = false;
 	std::vector<int32_t> byte_sizes_need_hash;
 
 	for(auto& ob : parsed_file.relationship_objects) {
 		for(auto& cc : ob.composite_indexes) {
-			needs_hash_include = true;
+			// needs_hash_include = true;
 
 			int32_t bits_so_far = 0;
 			for(auto& k : cc.component_indexes) {
@@ -1144,7 +957,7 @@ int main(int argc, char *argv[]) {
 		lua_ids_collection += "---@field _is_" + ob.name + "_id true\n\n";
 
 		std::string lua_namespace = ob.name;
-		for (int i = 0; i < lua_namespace.length(); i++) {
+		for (size_t i = 0; i < lua_namespace.length(); i++) {
 			lua_namespace[i] = std::toupper(lua_namespace[i]);
 		}
 
@@ -1178,7 +991,6 @@ int main(int argc, char *argv[]) {
 		auto append_lua = [&](function_call_information call) {
 			std::string lua_args = "";
 			lua_cdef += generate_head(call) + ";\n";
-			int counter = 0;
 			for (auto item : call.in) {
 				lua_args += item.name;
 				lua_cdef_wrapper += "---@param ";
@@ -1191,7 +1003,6 @@ int main(int argc, char *argv[]) {
 				}
 				lua_cdef_wrapper += "\n";
 				lua_args += ", ";
-				counter++;
 			}
 			if (call.out.meta_type != meta_information::empty) {
 				lua_cdef_wrapper += "---@return " + call.out.type.lua_type + "\n";
@@ -1221,14 +1032,14 @@ int main(int argc, char *argv[]) {
 
 		arg_information id_in = {
 			.meta_type = meta_information::id,
-			.type = normalize_type(parsed_file, convert_to_id(ob.name), made_types),
+			.type = normalize_type(convert_to_id(ob.name), made_types),
 			.name = "id",
 		};
 
 		auto gen_value = [&](std::string name, std::string base) {
 			arg_information out = {
 				.meta_type = meta_information::value,
-				.type = normalize_type(parsed_file, base, made_types),
+				.type = normalize_type(base, made_types),
 				.name = name
 			};
 			return out;
@@ -1238,23 +1049,6 @@ int main(int argc, char *argv[]) {
 			.meta_type = meta_information::empty,
 			.type = {},
 			.name = "???"
-		};
-
-		auto gen_id = [&](std::string name, std::string base) {
-			arg_information out = {
-				.meta_type = meta_information::id,
-				.type = normalize_type(parsed_file, base, made_types),
-				.name = name
-			};
-			return out;
-		};
-
-		auto gen_pointer = [&](std::string base) {
-			arg_information out = {
-				.meta_type = meta_information::value_pointer,
-				.type = normalize_type(parsed_file, base, made_types)
-			};
-			return out;
 		};
 
 		auto size_type = gen_value("value", "uint32_t");
@@ -1267,7 +1061,7 @@ int main(int argc, char *argv[]) {
 		append(gen_call_information("resize", array_access::function_call, {size_type}, void_type));
 
 		for(auto& prop : ob.properties) {
-			arg_information value = normalize_argument(parsed_file, "value", prop.data_type);
+			arg_information value = normalize_argument("value", prop.data_type);
 			if(prop.type == property_type::array_bitfield) {
 				value.type.normalized = lua_type_match::boolean;
 				value.type.c_type = "bool";
@@ -1280,7 +1074,7 @@ int main(int argc, char *argv[]) {
 				value.type.lua_type = "boolean";
 				value.type.api_type = "bool";
 			}
-			auto index = normalize_argument(parsed_file, "index", prop.array_index_type);
+			auto index = normalize_argument("index", prop.array_index_type);
 
 			if(prop.type == property_type::array_bitfield || prop.type == property_type::array_vectorizable || prop.type == property_type::array_other) {
 				if((prop.hook_get || !prop.is_derived) && value.type.normalized != lua_type_match::lua_object) {
@@ -1389,7 +1183,7 @@ int main(int argc, char *argv[]) {
 		for(auto& indexed : ob.indexed_objects) {
 			arg_information value {
 				.meta_type = meta_information::id,
-				.type = normalize_type(parsed_file, convert_to_id(indexed.type_name), made_types),
+				.type = normalize_type(convert_to_id(indexed.type_name), made_types),
 				.name = "linked_id",
 			};
 			if(indexed.index == index_type::at_most_one && ob.primary_key == indexed) {
@@ -1457,7 +1251,7 @@ int main(int argc, char *argv[]) {
 		for(auto& involved_in : ob.relationships_involved_in) {
 			arg_information involved_relation {
 				.meta_type = meta_information::id,
-				.type = normalize_type(parsed_file, convert_to_id(involved_in.relation_name), made_types),
+				.type = normalize_type(convert_to_id(involved_in.relation_name), made_types),
 				.name = "relation",
 			};
 			if(involved_in.linked_as->index == index_type::at_most_one) {

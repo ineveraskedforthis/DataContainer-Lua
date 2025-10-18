@@ -14,3 +14,9 @@ add_executable(
 )
 target_compile_definitions(DataContainer-Lua PRIVATE INCREMENTAL=1)
 target_include_directories(DataContainer-Lua PRIVATE ${PROJECT_SOURCE_DIR}/src/parser)
+
+if (MSVC)
+	target_compile_options(DataContainer-Lua PRIVATE /W4)
+else ()
+	target_compile_options(DataContainer-Lua PRIVATE -Wall -Wextra -Wpedantic)
+endif ()
