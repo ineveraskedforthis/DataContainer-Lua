@@ -250,7 +250,7 @@ enum class meta_information {
 };
 
 enum class array_access {
-	function_call, at_call
+	function_call, at_call, resize_call, size_call
 };
 
 struct arg_information {
@@ -416,7 +416,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 				break;
 			}
 		}
-	} else {
+	} else if (desc.access_type == array_access::at_call) {
 		if (desc.out.meta_type == meta_information::empty) {
 			assert(desc.in.size() == 3);
 			result += access_core_property_name(desc.accessed_object, desc.accessed_property);
@@ -434,8 +434,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 			access_string += access_core_property_name(desc.accessed_object, desc.accessed_property);
 			access_string += "(";
 			access_string += intermediate_type(desc.in[0]);
-			access_string += ")";
-			access_string += ".at(";
+			access_string += ").at(";
 			access_string += intermediate_type(desc.in[1]);
 			access_string += ")";
 
@@ -459,6 +458,28 @@ auto generate_body(file_def& file, function_call_information desc) {
 				break;
 			}
 		}
+	} else if (desc.access_type == array_access::resize_call) {
+		assert(desc.in.size() == 2);
+		assert(desc.out.meta_type == meta_information::empty);
+		std::string access_string = "";
+		access_string += access_core_property_name(desc.accessed_object, desc.accessed_property);
+		access_string += "(";
+		access_string += intermediate_type(desc.in[0]);
+		access_string += ").resize((uint32_t)";
+		access_string += intermediate_type(desc.in[1]);
+		access_string += ")";
+		result += "\t";
+		result += access_string;
+		result += ";\n";
+	} else if (desc.access_type == array_access::size_call) {
+		assert(desc.in.size() == 1);
+		assert(desc.out.meta_type == meta_information::value);
+		std::string access_string = "";
+		access_string += access_core_property_name(desc.accessed_object, desc.accessed_property);
+		access_string += "(";
+		access_string += intermediate_type(desc.in[0]);
+		access_string += ").size()";
+		result += "return (int32_t)(" + access_string + ");\n";
 	}
 
 	result += "}\n";
