@@ -20,7 +20,7 @@
 #include "parsing.hpp"
 
 static std::set<std::string> made_types;
-
+static std::string game_state;
 
 enum class meta_information {
 	id, value, value_pointer, empty
@@ -278,7 +278,7 @@ std::string access_property_name(
 std::string access_core_property_name(
 	std::string object_name, std::string property
 ) {
-	return "game_state." + object_name + "_" + property;
+	return game_state + "." + object_name + "_" + property;
 }
 
 
@@ -446,7 +446,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 		}
 	} else if (desc.access_type == array_access::set_call) {
 		assert(desc.in.size() == 3);
-		result += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
+		result += game_state + "." + desc.accessed_object + "_get_" + desc.accessed_property;
 		result += "(";
 		result += container_arg_string(desc.in[0], 0);
 		result += ")";
@@ -458,7 +458,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 	} else if (desc.access_type == array_access::get_call) {
 		assert(desc.in.size() == 2);
 		std::string access_string = "";
-		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
+		access_string += game_state + "." + desc.accessed_object + "_get_" + desc.accessed_property;
 		access_string += "(";
 		access_string += container_arg_string(desc.in[0], 0);
 		access_string += ").at(";
@@ -489,7 +489,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 		assert(desc.in.size() == 2);
 		assert(desc.out.meta_type == meta_information::empty);
 		std::string access_string = "";
-		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
+		access_string += game_state + "." + desc.accessed_object + "_get_" + desc.accessed_property;
 		access_string += "(";
 		access_string += container_arg_string(desc.in[0], 0);
 		access_string += ").resize(";
@@ -501,7 +501,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 		assert(desc.in.size() == 1);
 		assert(desc.out.meta_type == meta_information::value);
 		std::string access_string = "";
-		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
+		access_string += game_state + "." + desc.accessed_object + "_get_" + desc.accessed_property;
 		access_string += "(";
 		access_string += container_arg_string(desc.in[0], 0);
 		access_string += ").size()";
@@ -588,20 +588,22 @@ std::string to_luatype(
 
 int main(int argc, char *argv[]) {
 	if (argc < 5) {
-		printf("[1]: PROJECT NAME, [2]: DCON DEFINITION FILE, [3]: CPP OUTPUT FILE, [4]: HPP OUTPUT FILE, [5]: LUA OUTPUT FOLDER");
+		printf("[1]: PROJECT NAME, [2] DATA CONTAINER VARIABLE, [3]: DCON DEFINITION FILE, [4]: CPP OUTPUT FILE, [5]: HPP OUTPUT FILE, [6]: LUA OUTPUT FOLDER");
 		return 1;
-       }
+	}
 
 	const std::string project_name = argv[1];
 	const std::string project_prefix = project_name + "_";
 
-	std::fstream input_file;
-	std::string input_file_name(argv[2]);
-	input_file.open(argv[2], std::ios::in);
+	game_state = argv[2];
 
-	const std::string dll_source_name = argv[3];
-	const std::string dll_header_name = argv[4];
-	const std::string lua_folder = argv[5];
+	std::fstream input_file;
+	std::string input_file_name(argv[3]);
+	input_file.open(argv[3], std::ios::in);
+
+	const std::string dll_source_name = argv[4];
+	const std::string dll_header_name = argv[5];
+	const std::string lua_folder = argv[6];
 	const std::string lua_dcon_path = lua_folder + "/dcon_generated";
 	const std::string lua_manager_name = lua_folder + "/" + "manager.lua";
 
@@ -830,7 +832,7 @@ int main(int argc, char *argv[]) {
 
 
 	output += "//\n";
-	output += "// This file was automatically generated from: " + std::string(argv[2]) + "\n";
+	output += "// This file was automatically generated from: " + std::string(argv[3]) + "\n";
 	output += "// EDIT AT YOUR OWN RISK; all changes will be lost upon regeneration\n";
 	output += "// NOT SUITABLE FOR USE IN CRITICAL SOFTWARE WHERE LIVES OR LIVELIHOODS DEPEND ON THE CORRECT OPERATION\n";
 	output += "//\n";
@@ -847,7 +849,7 @@ int main(int argc, char *argv[]) {
 	header_output += "#pragma once\n";
 	header_output += "\n";
 	header_output += "//\n";
-	header_output += "// This file was automatically generated from: " + std::string(argv[2]) + "\n";
+	header_output += "// This file was automatically generated from: " + std::string(argv[3]) + "\n";
 	header_output += "// EDIT AT YOUR OWN RISK; all changes will be lost upon regeneration\n";
 	header_output += "// NOT SUITABLE FOR USE IN CRITICAL SOFTWARE WHERE LIVES OR LIVELIHOODS DEPEND ON THE CORRECT OPERATION\n";
 	header_output += "//\n";
@@ -866,7 +868,7 @@ int main(int argc, char *argv[]) {
 
 	//open new namespace
 	header_output += "\n";
-	header_output += "extern DCON_LUADLL_API " + parsed_file.namspace + "::data_container game_state;\n";
+	// header_output += parsed_file.namspace + "::data_container game_state;\n";
 	header_output += "\n";
 
 	output += "\n";
@@ -1232,7 +1234,7 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + access + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + access + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = " + game_state + "." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
 					lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
@@ -1245,7 +1247,7 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + access + "(int32_t i, int32_t subindex); \n";
 					output += "int32_t " + access + "(int32_t i, int32_t subindex) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = " + game_state + "." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn rng.begin()[subindex].id.index();\n";
 					output += "}\n";
 					lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
@@ -1266,14 +1268,14 @@ int main(int argc, char *argv[]) {
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "(int32_t i); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_range_" + involved_in.relation_name  + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = "+game_state+"." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
 
 					header_output += "DCON_LUADLL_API int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "(int32_t i, int32_t subindex); \n";
 					output += "int32_t " + project_prefix + ob.name + "_get_index_" + involved_in.relation_name + "(int32_t i, int32_t subindex) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
-					output += "\tauto rng = game_state." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
+					output += "\tauto rng = "+game_state+"." + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn rng.begin()[subindex].id.index();\n";
 					output += "}\n";
 				}
@@ -1286,33 +1288,33 @@ int main(int argc, char *argv[]) {
 		auto make_pop_back_delete = [&]() {
 			header_output += "DCON_LUADLL_API void " + project_prefix + "pop_back_" + ob.name + "(); \n";
 			output += "void " + project_prefix + "pop_back_" + ob.name + "() { \n";
-			output += "\tif(game_state." + ob.name + "_size() > 0) {\n";
-			output += "\t\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(game_state." + ob.name + "_size() - 1)};\n";
+			output += "\tif("+game_state+"." + ob.name + "_size() > 0) {\n";
+			output += "\t\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t("+game_state+"." + ob.name + "_size() - 1)};\n";
 			for(auto& p : ob.properties) {
 				if(p.data_type == "lua_reference_type") {
 					if(p.type == property_type::array_vectorizable || p.type == property_type::array_other) {
-						output += "\t\tfor(auto i = game_state." + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
+						output += "\t\tfor(auto i = "+game_state+"." + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
 						if(made_types.count(p.array_index_type) > 0) {
-							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = "+game_state+"." + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
 						} else {
-							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = "+game_state+"." + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
 						}
 						output += "\t\t}\n";
 					} else if(p.type == property_type::special_vector) {
 						output += "\t\t" + project_prefix + ob.name + "_resize_" + p.name + "(index.index(), 0);\n";
 					} else {
-						output += "\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
+						output += "\t\tif(auto result = "+game_state+"." + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
 					}
 				}
 			}
-			output += "\t\tgame_state.pop_back_" + ob.name + "();\n";
+			output += "\t\t"+game_state+".pop_back_" + ob.name + "();\n";
 			output += "\t}\n";
 			output += "}\n";
 		};
 		auto make_simple_create = [&]() {
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "create_" + ob.name + "(); \n";
 			output += "int32_t " + project_prefix + "create_" + ob.name + "() { \n";
-			output += "\tauto result = game_state.create_" + ob.name + "();\n";
+			output += "\tauto result = "+game_state+".create_" + ob.name + "();\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 		};
@@ -1323,21 +1325,21 @@ int main(int argc, char *argv[]) {
 			for(auto& p : ob.properties) {
 				if(p.data_type == "lua_reference_type") {
 					if(p.type == property_type::array_vectorizable || p.type == property_type::array_other) {
-						output += "\t\tfor(auto i = game_state." + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
+						output += "\t\tfor(auto i = "+game_state+"." + ob.name + "_get_" + p.name + "_size(); i-->0; ) {\n";
 						if(made_types.count(p.array_index_type) > 0) {
-							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = "+game_state+"." + ob.name + "_get_" + p.name + "(index, " + parsed_file.namspace + "::" + p.array_index_type + "{" + parsed_file.namspace + "::" + p.array_index_type + "::value_base_t(i)}); result != 0) release_object_function(result);\n";
 						} else {
-							output += "\t\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
+							output += "\t\t\tif(auto result = "+game_state+"." + ob.name + "_get_" + p.name + "(index, " + p.array_index_type + "(i)); result != 0) release_object_function(result);\n";
 						}
 						output += "\t\t}\n";
 					} else if(p.type == property_type::special_vector) {
 						output += "\t\t" + project_prefix + ob.name + "_resize_" + p.name + "(j, 0);\n";
 					} else {
-						output += "\t\tif(auto result = game_state." + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
+						output += "\t\tif(auto result = "+game_state+"." + ob.name + "_get_" + p.name + "(index); result != 0) release_object_function(result);\n";
 					}
 				}
 			}
-			output += "\tgame_state.delete_" + ob.name + "(index);\n";
+			output += "\t"+game_state+".delete_" + ob.name + "(index);\n";
 			output += "}\n";
 		};
 		auto make_relation_create = [&]() {
@@ -1368,13 +1370,13 @@ int main(int argc, char *argv[]) {
 
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "try_create_" + ob.name + "(" + pargs + "); \n";
 			output += "int32_t " + project_prefix + "try_create_" + ob.name + "(" + pargs + ") { \n";
-			output += "\tauto result = game_state.try_create_" + ob.name + "(" + params + ");\n";
+			output += "\tauto result = "+game_state+".try_create_" + ob.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "force_create_" + ob.name + "(" + pargs + "); \n";
 			output += "int32_t " + project_prefix + "force_create_" + ob.name + "(" + pargs + ") { \n";
-			output += "\tauto result = game_state.force_create_" + ob.name + "(" + params + ");\n";
+			output += "\tauto result = "+game_state+".force_create_" + ob.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 		};
@@ -1437,7 +1439,7 @@ int main(int argc, char *argv[]) {
 
 			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "get_" + ob.name + "_by_" + cc.name + "(" + pargs +"); \n";
 			output += "int32_t " + project_prefix + "get_" + ob.name + "_by_" + cc.name + "(" + pargs + ") { \n";
-			output += "\tauto result = game_state.get_" + ob.name + "_by_" + cc.name + "(" + params + ");\n";
+			output += "\tauto result = "+game_state+".get_" + ob.name + "_by_" + cc.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
 
@@ -1463,7 +1465,7 @@ int main(int argc, char *argv[]) {
 
 	header_output += "DCON_LUADLL_API int32_t " + project_prefix + "reset(); \n";
 	output += "int32_t " + project_prefix + "reset() { \n";
-	output += "\tgame_state.reset();\n";
+	output += "\t"+game_state+".reset();\n";
 	output += "\treturn 0;\n";
 	output += "}\n";
 
@@ -1472,11 +1474,11 @@ int main(int argc, char *argv[]) {
 		header_output += "DCON_LUADLL_API void " + project_prefix + rt.name + "_write_file(char const* name); \n";
 		output += "void " + project_prefix + rt.name + "_write_file(char const* name) { \n";
 		output += "\tstd::ofstream file_out(name, std::ios::binary);\n";
-		output += "\t"+ parsed_file.namspace + "::load_record selection = game_state.make_serialize_record_" + rt.name + "();\n";
-		output += "\tauto sz = game_state.serialize_size(selection);\n";
+		output += "\t"+ parsed_file.namspace + "::load_record selection = "+game_state+".make_serialize_record_" + rt.name + "();\n";
+		output += "\tauto sz = "+game_state+".serialize_size(selection);\n";
 		output += "\tstd::byte* temp_buffer = new std::byte[sz];\n";
 		output += "\tauto ptr = temp_buffer;\n";
-		output += "\tgame_state.serialize(ptr, selection); \n";
+		output += "\t"+game_state+".serialize(ptr, selection); \n";
 		output += "\tfile_out.write((char*)temp_buffer, sz);\n";
 		output += "\tdelete[] temp_buffer;\n";
 		output += "}\n";
@@ -1493,8 +1495,8 @@ int main(int argc, char *argv[]) {
 		output += "\tvec.insert(vec.begin(), std::istream_iterator<unsigned char>(file_in),  std::istream_iterator<unsigned char>());\n";
 		output += "\tstd::byte const* ptr = (std::byte const*)(vec.data());\n";
 		output += "\t" + parsed_file.namspace + "::load_record loaded;\n";
-		output += "\t" + parsed_file.namspace + "::load_record selection = game_state.make_serialize_record_" + rt.name + "();\n";
-		output += "\tgame_state.deserialize(ptr, ptr + sz, loaded, selection); \n";
+		output += "\t" + parsed_file.namspace + "::load_record selection = "+game_state+".make_serialize_record_" + rt.name + "();\n";
+		output += "\t"+game_state+".deserialize(ptr, ptr + sz, loaded, selection); \n";
 		output += "}\n";
 	}
 
