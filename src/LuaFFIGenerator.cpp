@@ -433,21 +433,21 @@ auto generate_body(file_def& file, function_call_information desc) {
 			assert(desc.in.size() == 3);
 			result += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 			result += "(";
-			result += intermediate_type(desc.in[0]);
+			result += container_arg_string(desc.in[0], 0);
 			result += ")";
 			result += ".at(";
-			result += intermediate_type(desc.in[1]);
+			result += container_arg_string(desc.in[1], 1);
 			result += ") = ";
-			result += intermediate_type(desc.in[2]);
+			result += container_arg_string(desc.in[2], 2);
 			result += ";\n";
 		} else {
 			assert(desc.in.size() == 2);
 			std::string access_string = "";
 			access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 			access_string += "(";
-			access_string += intermediate_type(desc.in[0]);
+			access_string += container_arg_string(desc.in[0], 0);
 			access_string += ").at(";
-			access_string += intermediate_type(desc.in[1]);
+			access_string += container_arg_string(desc.in[1], 1);
 			access_string += ")";
 
 			switch (desc.out.meta_type) {
@@ -477,9 +477,9 @@ auto generate_body(file_def& file, function_call_information desc) {
 		std::string access_string = "";
 		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 		access_string += "(";
-		access_string += intermediate_type(desc.in[0]);
+		access_string += container_arg_string(desc.in[0], 0);
 		access_string += ").resize(";
-		access_string += intermediate_type(desc.in[1]);
+		access_string += container_arg_string(desc.in[1], 1);
 		access_string += ")";
 		result += "\t";
 		result += access_string;
@@ -490,7 +490,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 		std::string access_string = "";
 		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 		access_string += "(";
-		access_string += intermediate_type(desc.in[0]);
+		access_string += container_arg_string(desc.in[0], 0);
 		access_string += ").size()";
 		result += "return (" + access_string + ");\n";
 	}
