@@ -21,6 +21,39 @@
 
 static std::set<std::string> made_types;
 
+
+enum class meta_information {
+	id, value, value_pointer, empty
+};
+
+enum class array_access {
+	function_call, get_call, set_call, resize_call, size_call
+};
+
+enum class lua_type_match {
+	fat_float, integer, floating_point, boolean, lua_object, handle_to_integer, opaque
+};
+struct combotype {
+	lua_type_match normalized;
+	std::string c_type;
+	std::string api_type;
+	std::string lua_type;
+};
+
+struct arg_information {
+	meta_information meta_type;
+	combotype type;
+	std::string name;
+};
+struct function_call_information {
+	array_access access_type;
+	std::string project_prefix;
+	std::string accessed_object;
+	std::string accessed_property;
+	std::vector<arg_information> in;
+	arg_information out;
+};
+
 void error_to_file(std::string const& file_name) {
 	std::fstream fileout;
 	fileout.open(file_name, std::ios::out);
@@ -80,9 +113,6 @@ relationship_object_def const* better_primary_key(relationship_object_def const*
 	return oldr;
 }
 
-enum class lua_type_match {
-	fat_float, integer, floating_point, boolean, lua_object, handle_to_integer, opaque
-};
 
 std::string convert_lua_enum_to_type(lua_type_match v) {
 	switch (v){
@@ -103,12 +133,6 @@ std::string convert_lua_enum_to_type(lua_type_match v) {
 	}
 }
 
-struct combotype {
-	lua_type_match normalized;
-	std::string c_type;
-	std::string api_type;
-	std::string lua_type;
-};
 
 
 std::string convert_to_id(std::string in) {
@@ -234,9 +258,21 @@ std::string declare_index_from_raw (std::string indent, file_def& file, std::str
 }
 
 std::string access_property_name(
-	std::string object_name, std::string project_prefix, std::string property
+	function_call_information desc
+	// std::string object_name, std::string project_prefix, std::string property
 ) {
-	return project_prefix + object_name + "_" + property;
+	std::string property = desc.accessed_property;
+	// replace for vector pools
+	if (desc.access_type == array_access::get_call) {
+		property = "get_" + property;
+	} else if (desc.access_type == array_access::set_call) {
+		property = "set_" + property;
+	} else if (desc.access_type == array_access::resize_call) {
+		property = "size_" + property;
+	} else if (desc.access_type == array_access::size_call) {
+		property = "resize_" + property;
+	}
+	return desc.project_prefix + desc.accessed_object + "_" + property;
 }
 
 std::string access_core_property_name(
@@ -245,19 +281,6 @@ std::string access_core_property_name(
 	return "game_state." + object_name + "_" + property;
 }
 
-enum class meta_information {
-	id, value, value_pointer, empty
-};
-
-enum class array_access {
-	function_call, at_call, resize_call, size_call
-};
-
-struct arg_information {
-	meta_information meta_type;
-	combotype type;
-	std::string name;
-};
 
 arg_information normalize_argument(std::string name, bool is_bool, std::string& declared_type) {
 	if (made_types.count(declared_type) + made_types.count(declared_type + "_id") > 0) {
@@ -312,14 +335,7 @@ std::string to_string(arg_information type_desc) {
 	}
 }
 
-struct function_call_information {
-	array_access access_type;
-	std::string project_prefix;
-	std::string accessed_object;
-	std::string accessed_property;
-	std::vector<arg_information> in;
-	arg_information out;
-};
+
 
 std::string api_arg_string(arg_information& arg, int counter) {
 	return "api_arg_" + std::to_string(counter) + "_" + to_string(arg.meta_type);
@@ -346,7 +362,7 @@ std::string generate_head(function_call_information desc) {
 	std::string result = "";
 	result += to_string(desc.out);
 	result += " ";
-	result += access_property_name(desc.accessed_object, desc.project_prefix, desc.accessed_property);
+	result += access_property_name(desc);
 	result += "(";
 	auto counter = 0;
 	for (auto& item : desc.in) {
@@ -428,48 +444,46 @@ auto generate_body(file_def& file, function_call_information desc) {
 				break;
 			}
 		}
-	} else if (desc.access_type == array_access::at_call) {
-		if (desc.out.meta_type == meta_information::empty) {
-			assert(desc.in.size() == 3);
-			result += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
-			result += "(";
-			result += container_arg_string(desc.in[0], 0);
-			result += ")";
-			result += ".at(";
-			result += container_arg_string(desc.in[1], 1);
-			result += ") = ";
-			result += container_arg_string(desc.in[2], 2);
-			result += ";\n";
-		} else {
-			assert(desc.in.size() == 2);
-			std::string access_string = "";
-			access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
-			access_string += "(";
-			access_string += container_arg_string(desc.in[0], 0);
-			access_string += ").at(";
-			access_string += container_arg_string(desc.in[1], 1);
-			access_string += ")";
+	} else if (desc.access_type == array_access::set_call) {
+		assert(desc.in.size() == 3);
+		result += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
+		result += "(";
+		result += container_arg_string(desc.in[0], 0);
+		result += ")";
+		result += ".at(";
+		result += container_arg_string(desc.in[1], 1);
+		result += ") = ";
+		result += container_arg_string(desc.in[2], 2);
+		result += ";\n";
+	} else if (desc.access_type == array_access::get_call) {
+		assert(desc.in.size() == 2);
+		std::string access_string = "";
+		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
+		access_string += "(";
+		access_string += container_arg_string(desc.in[0], 0);
+		access_string += ").at(";
+		access_string += container_arg_string(desc.in[1], 1);
+		access_string += ")";
 
-			switch (desc.out.meta_type) {
+		switch (desc.out.meta_type) {
 
-			case meta_information::id: {
-				result += intermediate_type(desc.out);
-				result += " result = ";
-				result += access_string + ";\n";
-				result += "\treturn result.index();\n";
-				break;
-			}
-			case meta_information::value: {
-				result += "return " + access_string + ";\n";
-				break;
-			}
-			case meta_information::value_pointer: {
-				result += "return &" + access_string + ";\n";
-				break;
-			}
-			case meta_information::empty:
-				break;
-			}
+		case meta_information::id: {
+			result += intermediate_type(desc.out);
+			result += " result = ";
+			result += access_string + ";\n";
+			result += "\treturn result.index();\n";
+			break;
+		}
+		case meta_information::value: {
+			result += "return " + access_string + ";\n";
+			break;
+		}
+		case meta_information::value_pointer: {
+			result += "return &" + access_string + ";\n";
+			break;
+		}
+		case meta_information::empty:
+			break;
 		}
 	} else if (desc.access_type == array_access::resize_call) {
 		assert(desc.in.size() == 2);
@@ -481,7 +495,6 @@ auto generate_body(file_def& file, function_call_information desc) {
 		access_string += ").resize(";
 		access_string += container_arg_string(desc.in[1], 1);
 		access_string += ")";
-		result += "\t";
 		result += access_string;
 		result += ";\n";
 	} else if (desc.access_type == array_access::size_call) {
@@ -498,102 +511,6 @@ auto generate_body(file_def& file, function_call_information desc) {
 	result += "}\n";
 
 	return result;
-}
-
-
-std::string id_to_value_head(
-	std::string object, std::string project_prefix, std::string property, std::string result_type
-) {
-	return result_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
-}
-
-std::string id_to_value_pointer_head(
-	std::string object, std::string project_prefix, std::string property, std::string result_type
-) {
-	return result_type + "* " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
-}
-
-std::string id_to_id_head(
-	std::string object, std::string project_prefix, std::string property
-) {
-	return "int32_t " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
-}
-
-std::string id_id_to_void_head(
-	std::string object, std::string project_prefix, std::string property
-) {
-	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_target_id)";
-}
-
-std::string id_index_to_id_head(
-	std::string object, std::string project_prefix, std::string property
-) {
-	return "int32_t " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
-}
-
-std::string id_index_id_to_void_head(
-	std::string object, std::string project_prefix, std::string property
-) {
-	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index, int32_t raw_target_id)";
-}
-
-std::string void_to_value_head(
-	std::string object, std::string project_prefix, std::string property, std::string result_type
-) {
-	return result_type + " " + access_property_name(object, project_prefix, property) + "()";
-}
-
-std::string id_index_to_value_head(
-	std::string object, std::string project_prefix, std::string property,
-	std::string property_type, std::string index_type
-) {
-	return property_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, " + index_type + " raw_index)";
-}
-
-std::string id_to_void_head(
-	std::string object, std::string project_prefix, std::string property
-) {
-	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
-}
-
-std::string id_value_to_void_head(
-	std::string object, std::string project_prefix, std::string property, std::string value_type
-) {
-	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, "+ value_type + " value)";
-}
-
-std::string id_index_to_void_head(
-	std::string object, std::string project_prefix, std::string property
-) {
-	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
-}
-
-std::string id_index_to_value_head(
-	std::string object, std::string project_prefix, std::string property, std::string value_type
-) {
-	return value_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
-}
-std::string id_index_to_value_pointer_head(
-	std::string object, std::string project_prefix, std::string property, std::string value_type
-) {
-	return value_type + "* " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
-}
-std::string id_index_value_to_void_head(
-	std::string object, std::string project_prefix, std::string property, std::string value_type
-) {
-	return "void " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index, " + value_type + " value)";
-}
-
-std::string value_to_void_head(
-	std::string object, std::string project_prefix, std::string property, std::string value_type
-) {
-	return "void " + access_property_name(object, project_prefix, property) + "("+ value_type + " value)";
-}
-
-std::string type_to_void_head(
-	std::string object, std::string project_prefix, std::string property, std::string type
-) {
-	return "void " + access_property_name(object, project_prefix, property) +  "(" + type + "arg)";
 }
 
 std::string lua_id(
@@ -1046,10 +963,21 @@ int main(int argc, char *argv[]) {
 				lua_args.pop_back();
 				lua_args.pop_back();
 			}
-			lua_cdef_wrapper += "function " + lua_namespace + "." + call.accessed_property + "(";
+			std::string property = call.accessed_property;
+			// replace for vector pools
+			if (call.access_type == array_access::get_call) {
+				property = "get_" + property;
+			} else if (call.access_type == array_access::set_call) {
+				property = "set_" + property;
+			} else if (call.access_type == array_access::resize_call) {
+				property = "size_" + property;
+			} else if (call.access_type == array_access::size_call) {
+				property = "resize_" + property;
+			}
+			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(";
 			lua_cdef_wrapper += lua_args;
 			lua_cdef_wrapper += ")\n";
-			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, call.accessed_property) + "(" + lua_args + ")\n";
+			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(call) + "(" + lua_args + ")\n";
 			lua_cdef_wrapper += "end\n";
 		};
 
@@ -1134,8 +1062,8 @@ int main(int argc, char *argv[]) {
 				if((prop.hook_get || !prop.is_derived) && value.type.normalized != lua_type_match::lua_object) {
 					append(
 						gen_call_information(
-							"get_" + prop.name,
-							array_access::at_call,
+							prop.name,
+							array_access::get_call,
 							{
 								id_in,
 								size_type
@@ -1145,7 +1073,7 @@ int main(int argc, char *argv[]) {
 					);
 					append(
 						gen_call_information(
-							"size_" + prop.name,
+							prop.name,
 							array_access::size_call,
 							{
 								id_in
@@ -1155,7 +1083,7 @@ int main(int argc, char *argv[]) {
 					);
 					append(
 						gen_call_information(
-							"resize_" + prop.name,
+							prop.name,
 							array_access::resize_call,
 							{
 								id_in, size_type
@@ -1165,8 +1093,8 @@ int main(int argc, char *argv[]) {
 					);
 					if (value.type.normalized != lua_type_match::opaque) append(
 						gen_call_information(
-							"set_" + prop.name,
-							array_access::at_call,
+							prop.name,
+							array_access::set_call,
 							{
 								id_in,
 								size_type,
