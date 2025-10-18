@@ -431,7 +431,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 	} else if (desc.access_type == array_access::at_call) {
 		if (desc.out.meta_type == meta_information::empty) {
 			assert(desc.in.size() == 3);
-			result += access_core_property_name(desc.accessed_object, desc.accessed_property);
+			result += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 			result += "(";
 			result += intermediate_type(desc.in[0]);
 			result += ")";
@@ -443,7 +443,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 		} else {
 			assert(desc.in.size() == 2);
 			std::string access_string = "";
-			access_string += access_core_property_name(desc.accessed_object, desc.accessed_property);
+			access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 			access_string += "(";
 			access_string += intermediate_type(desc.in[0]);
 			access_string += ").at(";
@@ -475,10 +475,10 @@ auto generate_body(file_def& file, function_call_information desc) {
 		assert(desc.in.size() == 2);
 		assert(desc.out.meta_type == meta_information::empty);
 		std::string access_string = "";
-		access_string += access_core_property_name(desc.accessed_object, desc.accessed_property);
+		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 		access_string += "(";
 		access_string += intermediate_type(desc.in[0]);
-		access_string += ").resize((uint32_t)";
+		access_string += ").resize(";
 		access_string += intermediate_type(desc.in[1]);
 		access_string += ")";
 		result += "\t";
@@ -488,11 +488,11 @@ auto generate_body(file_def& file, function_call_information desc) {
 		assert(desc.in.size() == 1);
 		assert(desc.out.meta_type == meta_information::value);
 		std::string access_string = "";
-		access_string += access_core_property_name(desc.accessed_object, desc.accessed_property);
+		access_string += "game_state." + desc.accessed_object + "_get_" + desc.accessed_property;
 		access_string += "(";
 		access_string += intermediate_type(desc.in[0]);
 		access_string += ").size()";
-		result += "return (int32_t)(" + access_string + ");\n";
+		result += "return (" + access_string + ");\n";
 	}
 
 	result += "}\n";
@@ -1145,7 +1145,7 @@ int main(int argc, char *argv[]) {
 					);
 					append(
 						gen_call_information(
-							"get_" + prop.name,
+							"size_" + prop.name,
 							array_access::size_call,
 							{
 								id_in
@@ -1155,7 +1155,7 @@ int main(int argc, char *argv[]) {
 					);
 					append(
 						gen_call_information(
-							"get_" + prop.name,
+							"resize_" + prop.name,
 							array_access::resize_call,
 							{
 								id_in, size_type
