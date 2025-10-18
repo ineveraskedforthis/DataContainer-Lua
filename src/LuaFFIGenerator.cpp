@@ -1028,7 +1028,7 @@ int main(int argc, char *argv[]) {
 			auto index = normalize_argument("index", false, prop.array_index_type);
 
 			if(prop.type == property_type::array_bitfield || prop.type == property_type::array_vectorizable || prop.type == property_type::array_other) {
-				if((prop.hook_get || !prop.is_derived) && value.type.normalized != lua_type_match::lua_object) {
+				if((prop.hook_get || !prop.is_derived) && value.type.normalized != lua_type_match::lua_object && (index.meta_type != meta_information::value_pointer)) {
 					append(
 						gen_call_information(
 							"get_" + prop.name,
@@ -1059,7 +1059,7 @@ int main(int argc, char *argv[]) {
 					append(gen_call_information("resize_" + prop.name, array_access::function_call, {size_type}, void_type));
 				}
 			} else if(prop.type == property_type::special_vector) {
-				if((prop.hook_get || !prop.is_derived) && value.type.normalized != lua_type_match::lua_object) {
+				if((prop.hook_get || !prop.is_derived) && value.type.normalized != lua_type_match::lua_object && (index.meta_type != meta_information::value_pointer)) {
 					append(
 						gen_call_information(
 							prop.name,
