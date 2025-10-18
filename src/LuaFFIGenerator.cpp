@@ -239,6 +239,19 @@ std::string id_to_value_body(
 	return generated;
 }
 
+std::string id_to_value_pointer_body(
+	file_def& file, std::string object_name, std::string property
+) {
+	std::string generated = "";
+	generated += "{\n";
+
+	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
+	generated += "\treturn &" + access_core_property_name(object_name, property) + "(true_id);\n";
+
+	generated += "}\n";
+	return generated;
+}
+
 
 std::string id_index_to_id_body(
 	file_def& file, std::string object_name, std::string index_type, std::string property, std::string target_id
@@ -332,6 +345,20 @@ std::string id_index_to_value_body(
 	return generated;
 }
 
+std::string id_index_to_value_pointer_body(
+	file_def& file, std::string object_name, std::string index_type, std::string property
+) {
+	std::string generated = "";
+	generated += "{\n";
+
+	generated += declare_id_from_raw("\t", file, object_name + "*", "raw_id", "true_id");
+	generated += declare_index_from_raw("\t", file, index_type, "raw_index", "true_index");
+	generated += "\treturn &" + access_core_property_name(object_name, property) + "(true_id, true_index);\n";
+
+	generated += "}\n";
+	return generated;
+}
+
 std::string id_to_id_body(
 	file_def& file, std::string object_name, std::string target_type, std::string property
 ) {
@@ -390,6 +417,12 @@ std::string id_to_value_head(
 	std::string object, std::string project_prefix, std::string property, std::string result_type
 ) {
 	return result_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
+}
+
+std::string id_to_value_pointer_head(
+	std::string object, std::string project_prefix, std::string property, std::string result_type
+) {
+	return result_type + "* " + access_property_name(object, project_prefix, property) + "(int32_t raw_id)";
 }
 
 std::string id_to_id_head(
@@ -451,6 +484,11 @@ std::string id_index_to_value_head(
 	std::string object, std::string project_prefix, std::string property, std::string value_type
 ) {
 	return value_type + " " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
+}
+std::string id_index_to_value_pointer_head(
+	std::string object, std::string project_prefix, std::string property, std::string value_type
+) {
+	return value_type + "* " + access_property_name(object, project_prefix, property) + "(int32_t raw_id, int32_t raw_index)";
 }
 std::string id_index_value_to_void_head(
 	std::string object, std::string project_prefix, std::string property, std::string value_type
@@ -893,6 +931,11 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id)\n";
 			lua_cdef_wrapper += "end\n";
 		};
+		auto append_id_to_value_pointer = [&](std::string property, std::string ctype, std::string luatype) {
+			std::string head = id_to_value_pointer_head(ob.name, project_prefix, property, ctype);
+			header_output += "DCON_LUADLL_API " + head + ";\n";
+			output += head + id_to_value_pointer_body(parsed_file, ob.name, property);
+		};
 		auto append_id_to_id = [&](std::string property, std::string target_id_name) {
 			target_id_name = convert_to_id(target_id_name);
 			std::string head = id_to_id_head(ob.name, project_prefix, property);
@@ -1032,6 +1075,11 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "function " + lua_namespace + "." + property + "(id, index)\n";
 			lua_cdef_wrapper += "\treturn ffi.C." + access_property_name(ob.name, project_prefix, property) + "(id, index)\n";
 			lua_cdef_wrapper += "end\n";;
+		};
+		auto append_id_index_to_value_pointer = [&](std::string property, std::string index_type, std::string value_type, std::string value_luatype) {
+			std::string head = id_index_to_value_pointer_head(ob.name, project_prefix, property, value_type);
+			header_output += "DCON_LUADLL_API " + head + ";\n";
+			output += head + id_index_to_value_pointer_body(parsed_file, ob.name, index_type, property);
 		};
 		auto append_id_index_value_to_void = [&](std::string property, std::string index_type, std::string value_type, std::string value_luatype) {
 			auto normal_type = normalize_type(parsed_file, index_type, made_types);
@@ -1255,7 +1303,7 @@ int main(int argc, char *argv[]) {
 						break;
 					case lua_type_match::opaque:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_to_value("get_" + prop.name, prop.data_type + "*", "");
+							append_id_to_value_pointer("get_" + prop.name, prop.data_type, "");
 						}
 						// currently unexposed
 						break;
