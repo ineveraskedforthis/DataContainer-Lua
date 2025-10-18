@@ -80,7 +80,7 @@ relationship_object_def const* better_primary_key(relationship_object_def const*
 }
 
 enum class lua_type_match {
-	integer, floating_point, boolean, lua_object, handle_to_integer, opaque
+	fat_float, integer, floating_point, boolean, lua_object, handle_to_integer, opaque
 };
 
 std::string convert_lua_enum_to_type(lua_type_match v) {
@@ -88,6 +88,8 @@ std::string convert_lua_enum_to_type(lua_type_match v) {
         case lua_type_match::integer:
 		return "number";
         case lua_type_match::floating_point:
+		return "number";
+	case lua_type_match::fat_float:
 		return "number";
         case lua_type_match::boolean:
 		return "boolean";
@@ -100,33 +102,81 @@ std::string convert_lua_enum_to_type(lua_type_match v) {
         }
 }
 
-inline lua_type_match normalize_type(std::string const& in, std::set<std::string> const& made_types) {
-	if(in == "char" || in == "unsigned char" || in == "bool" || in == "int8_t" || in == "uint8_t")
-		return lua_type_match::integer;
-	if(in == "signed char")
-		return lua_type_match::integer;
-	if(in == "short" || in == "int16_t" || in == "uint16_t")
-		return  lua_type_match::integer;
-	if(in == "unsigned short")
-		return lua_type_match::integer;
-	if(in == "bitfield")
-		return lua_type_match::boolean;
-	if(in == "int" || in == "long")
-		return lua_type_match::integer;
-	if(in == "unsigned int" || in == "unsigned long" || in == "int32_t" || in == "uint32_t")
-		return lua_type_match::integer;
-	if(in == "size_t" || in == "unsigned long long" || in == "int64_t" || in == "uint64_t")
-		return lua_type_match::floating_point;
-	if(in == "long long")
-		return lua_type_match::floating_point;
-	if(in == "float" || in == "double")
-		return lua_type_match::floating_point;
-	if(in == "lua_reference_type")
-		return lua_type_match::lua_object;
-	if(made_types.count(in) != 0)
-		return lua_type_match::handle_to_integer;
+struct combotype {
+	lua_type_match normalized;
+	std::string c_type;
+	std::string api_type;
+	std::string lua_type;
+};
 
-	return lua_type_match::opaque;
+combotype normalize_type(file_def& file, std::string const& in, std::set<std::string> const& made_types);
+
+combotype normalize_type(file_def& file, std::string const& in, std::set<std::string> const& made_types) {
+	if (
+		in == "char"
+		|| in == "unsigned char"
+		|| in == "bool"
+		|| in == "int8_t"
+		|| in == "uint8_t"
+		|| in == "signed char"
+		|| in == "short"
+		|| in == "int16_t"
+		|| in == "uint16_t"
+		|| in == "unsigned short"
+		|| in == "int"
+		|| in == "long"
+		|| in == "unsigned int"
+		|| in == "unsigned long"
+		|| in == "int32_t"
+		|| in == "uint32_t"
+		|| in == "size_t"
+		|| in == "unsigned long long"
+		|| in == "int64_t"
+		|| in == "uint64_t"
+		|| in == "long long"
+		|| in == "float"
+		|| in == "double"
+	)
+		return {
+			lua_type_match::fat_float,
+			in,
+			in,
+			"number"
+		};
+	if(in == "bitfield")
+		return {
+			lua_type_match::boolean,
+			in,
+			"bool",
+			"boolean"
+		};
+	if(in == "lua_reference_type")
+		return {
+			lua_type_match::lua_object,
+			in,
+			"int32_t",
+			"number"
+		};
+	// for(auto& mi : file.extra_ids) {
+	// 	if (mi.name == in) {
+	// 		return normalize_type(file, mi.base_type, made_types);
+	// 	}
+	// }
+
+	if(made_types.count(in) != 0)
+		return {
+			lua_type_match::handle_to_integer,
+			in,
+			"int32_t",
+			"number"
+		};
+
+	return {
+		lua_type_match::opaque,
+		"???",
+		"???",
+		"table"
+	};
 }
 
 std::string convert_raw_to_id (file_def& file, std::string object_name, std::string raw_id) {
@@ -140,12 +190,12 @@ std::string convert_raw_to_id_from_id (file_def& file, std::string id_type_name,
 }
 
 std::string convert_raw_to_index (file_def& file, std::string index_type, std::string raw_index) {
-	auto norm_index_type = normalize_type(index_type, made_types);
+	auto norm_index_type = normalize_type(file, index_type, made_types);
 	std::string index_access_string;
-	if(norm_index_type == lua_type_match::handle_to_integer) {
+	if(norm_index_type.normalized == lua_type_match::handle_to_integer) {
 		index_access_string = convert_raw_to_id_from_id(file, index_type, raw_index);
 	} else {
-		index_access_string = "(" + index_type + ")(" + raw_index + ");\n";
+		index_access_string = "(" + norm_index_type.c_type + ")(" + raw_index + ");\n";
 	}
 	return index_access_string;
 }
@@ -190,14 +240,14 @@ std::string id_to_value_body(
 
 
 std::string id_index_to_id_body(
-	file_def& file, std::string object_name, std::string property
+	file_def& file, std::string object_name, std::string property, std::string target_id
 ) {
 	std::string generated = "";
 	generated += "{\n";
 
 	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\tauto result = " + access_core_property_name(object_name, property) + "(true_id, index);\n";
-	generated += "\treturn result.id.index();\n";
+	generated += "\tdcon::" + target_id + " result = " + access_core_property_name(object_name, property) + "(true_id, index);\n";
+	generated += "\treturn result.index();\n";
 
 	generated += "}\n";
 	return generated;
@@ -285,7 +335,8 @@ std::string id_to_id_body(
 	std::string generated = "";
 	generated += "{\n";
 	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\treturn " + access_core_property_name(object_name, property) + "(true_id).index();\n";
+	generated += "\tdcon::" + target_type + " result = " + access_core_property_name(object_name, property) + "(true_id);";
+	generated += "\treturn result.index();\n";
 	generated += "}\n";
 	return generated;
 }
@@ -296,7 +347,8 @@ std::string id_to_id_fat_body(
 	std::string generated = "";
 	generated += "{\n";
 	generated += declare_id_from_raw("\t", file, object_name, "raw_id", "true_id");
-	generated += "\treturn " + access_core_property_name(object_name, property) + "(true_id).id.index();\n";
+	generated += "\tdcon::" + target_type + " result = " + access_core_property_name(object_name, property) + "(true_id);\n";
+	generated += "\treturn result.index();\n";
 	generated += "}\n";
 	return generated;
 }
@@ -485,6 +537,14 @@ std::string to_luatype(
 		}
 	}
 	return flat_name;
+}
+
+std::string convert_to_id(std::string in) {
+	if (made_types.count(in) > 0) {
+		return in;
+	} else {
+		return in + "_id";
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -830,9 +890,7 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "end\n";
 		};
 		auto append_id_to_id = [&](std::string property, std::string target_id_name) {
-			if (!target_id_name.ends_with("_id")) {
-				target_id_name += "_id";
-			}
+			target_id_name = convert_to_id(target_id_name);
 			std::string head = id_to_id_head(ob.name, project_prefix, property);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
 			output += head + id_to_id_body(parsed_file, ob.name, target_id_name, property);
@@ -844,9 +902,7 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "end\n";
 		};
 		auto append_id_to_id_fat = [&](std::string property, std::string target_id_name) {
-			if (!target_id_name.ends_with("_id")) {
-				target_id_name += "_id";
-			}
+			target_id_name = convert_to_id(target_id_name);
 			std::string head = id_to_id_head(ob.name, project_prefix, property);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
 			output += head + id_to_id_fat_body(parsed_file, ob.name, target_id_name, property);
@@ -858,12 +914,10 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "end\n";
 		};
 		auto append_id_index_to_id = [&](std::string property, std::string target_id_name) {
-			if (!target_id_name.ends_with("_id")) {
-				target_id_name += "_id";
-			}
+			target_id_name = convert_to_id(target_id_name);
 			std::string head = id_index_to_id_head(ob.name, project_prefix, property);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
-			output += head + id_index_to_id_body(parsed_file, ob.name, property);
+			output += head + id_index_to_id_body(parsed_file, ob.name, property, target_id_name);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
 			lua_cdef_wrapper += "---@param index number\n";
@@ -873,9 +927,7 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "end\n";
 		};
 		auto append_id_index_id_to_void = [&](std::string property, std::string target_id_name) {
-			if (!target_id_name.ends_with("_id")) {
-				target_id_name += "_id";
-			}
+			target_id_name = convert_to_id(target_id_name);
 			std::string head = id_index_id_to_void_head(ob.name, project_prefix, property);
 			header_output += "DCON_LUADLL_API " + head + ";\n";
 			output += head + id_index_id_to_void_body(parsed_file, ob.name, target_id_name, property);
@@ -924,8 +976,8 @@ int main(int argc, char *argv[]) {
 			output += head + id_index_to_value_body(parsed_file, ob.name, index_type, property);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
-			auto normal_type = normalize_type(index_type, made_types);
-			if (normal_type == lua_type_match::handle_to_integer) {
+			auto normal_type = normalize_type(parsed_file, index_type, made_types);
+			if (normal_type.normalized == lua_type_match::handle_to_integer) {
 				lua_cdef_wrapper += "---@param index " + lua_id(index_type) + "\n";
 			} else {
 				lua_cdef_wrapper += "---@param index number\n";
@@ -954,8 +1006,8 @@ int main(int argc, char *argv[]) {
 			}
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
-			auto normal_type = normalize_type(index_type, made_types);
-			if (normal_type == lua_type_match::handle_to_integer) {
+			auto normal_type = normalize_type(parsed_file, index_type, made_types);
+			if (normal_type.normalized == lua_type_match::handle_to_integer) {
 				lua_cdef_wrapper += "---@param index " + lua_id(index_type) + "\n";
 			} else {
 				lua_cdef_wrapper += "---@param index number\n";
@@ -971,8 +1023,8 @@ int main(int argc, char *argv[]) {
 			output += head + id_index_value_to_void_body(parsed_file, ob.name, index_type, property);
 			lua_cdef += head + ";\n";
 			lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
-			auto normal_type = normalize_type(index_type, made_types);
-			if (normal_type == lua_type_match::handle_to_integer) {
+			auto normal_type = normalize_type(parsed_file, index_type, made_types);
+			if (normal_type.normalized == lua_type_match::handle_to_integer) {
 				lua_cdef_wrapper += "---@param index " + lua_id(index_type) + "\n";
 			} else {
 				lua_cdef_wrapper += "---@param index number\n";
@@ -998,34 +1050,30 @@ int main(int argc, char *argv[]) {
 		append_value_to_void("resize", "uint32_t", "number");
 
 		for(auto& prop : ob.properties) {
-			auto norm_property_type = normalize_type(prop.data_type, made_types);
+			auto norm_property_type = normalize_type(parsed_file, prop.data_type, made_types);
 
-			auto c_type = prop.data_type;
 			if(prop.type == property_type::array_bitfield) {
-				norm_property_type = lua_type_match::boolean;
-				c_type = "bool";
+				norm_property_type.normalized = lua_type_match::boolean;
+				norm_property_type.c_type = "bool";
+				norm_property_type.lua_type = "boolean";
+				norm_property_type.api_type = "bool";
 			}
 			if(prop.type == property_type::bitfield) {
-				norm_property_type = lua_type_match::boolean;
-				c_type = "bool";
+				norm_property_type.normalized = lua_type_match::boolean;
+				norm_property_type.c_type = "bool";
+				norm_property_type.lua_type = "boolean";
+				norm_property_type.api_type = "bool";
 			}
 
-			auto lua_type = convert_lua_enum_to_type(norm_property_type);
-
 			if(prop.type == property_type::array_bitfield || prop.type == property_type::array_vectorizable || prop.type == property_type::array_other) {
-
-				switch(norm_property_type) {
+				switch(norm_property_type.normalized) {
 					case lua_type_match::integer:
 					case lua_type_match::floating_point:
-						if(prop.hook_get || !prop.is_derived) {
-							append_id_index_to_value("get_" + prop.name, prop.array_index_type, c_type, lua_type);
-							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, c_type, lua_type);
-						}
-						break;
 					case lua_type_match::boolean:
+					case lua_type_match::fat_float:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_index_to_value("get_" + prop.name, prop.array_index_type, c_type, lua_type);
-							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, c_type, lua_type);
+							append_id_index_to_value("get_" + prop.name, prop.array_index_type, norm_property_type.api_type, norm_property_type.lua_type);
+							append_id_index_value_to_void("set_" + prop.name, prop.array_index_type, norm_property_type.api_type, norm_property_type.lua_type);
 						}
 						break;
 					case lua_type_match::lua_object:
@@ -1056,12 +1104,13 @@ int main(int argc, char *argv[]) {
 				}
 
 			} else if(prop.type == property_type::special_vector) {
-				auto norm_index_type = normalize_type(prop.array_index_type, made_types);
+				auto norm_index_type = normalize_type(parsed_file, prop.array_index_type, made_types);
 
-				switch(norm_property_type) {
-					case lua_type_match::boolean:
-					case lua_type_match::floating_point:
+				switch(norm_property_type.normalized) {
 					case lua_type_match::integer:
+					case lua_type_match::floating_point:
+					case lua_type_match::boolean:
+					case lua_type_match::fat_float:
 						if(prop.hook_get || !prop.is_derived) {
 							header_output += "DCON_LUADLL_API " + prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx); \n";
 							output += prop.data_type + " " + project_prefix + ob.name + "_get_" + prop.name + "(int32_t i, int32_t idx) { \n";
@@ -1170,18 +1219,14 @@ int main(int argc, char *argv[]) {
 						break;
 				}
 			} else {
-				switch(norm_property_type) {
+				switch(norm_property_type.normalized) {
 					case lua_type_match::floating_point:
 					case lua_type_match::integer:
-						if(prop.hook_get || !prop.is_derived) {
-							append_id_to_value("get_" + prop.name, c_type, "number");
-							append_id_value_to_void("set_" + prop.name, c_type, "number");
-						}
-						break;
 					case lua_type_match::boolean:
+					case lua_type_match::fat_float:
 						if(prop.hook_get || !prop.is_derived) {
-							append_id_to_value("get_" + prop.name, c_type, "boolean");
-							append_id_value_to_void("set_" + prop.name, c_type, "boolean");
+							append_id_to_value("get_" + prop.name, norm_property_type.api_type, norm_property_type.lua_type);
+							append_id_value_to_void("set_" + prop.name, norm_property_type.api_type, norm_property_type.lua_type);
 						}
 						break;
 					case lua_type_match::lua_object:
