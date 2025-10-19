@@ -516,7 +516,7 @@ auto generate_body(file_def& file, function_call_information desc) {
 std::string lua_id(
 	std::string object_name
 ) {
-	return "weak_" + object_name;
+	return object_name;
 }
 
 /*
@@ -950,7 +950,7 @@ int main(int argc, char *argv[]) {
 				lua_cdef_wrapper += item.name;
 				lua_cdef_wrapper += " ";
 				if (item.meta_type == meta_information::id) {
-					lua_cdef_wrapper += item.type.c_type;
+					lua_cdef_wrapper += lua_id(item.type.c_type);
 				} else if (item.meta_type == meta_information::value) {
 					lua_cdef_wrapper += item.type.lua_type;
 				}
@@ -958,7 +958,11 @@ int main(int argc, char *argv[]) {
 				lua_args += ", ";
 			}
 			if (call.out.meta_type != meta_information::empty) {
-				lua_cdef_wrapper += "---@return " + call.out.type.lua_type + "\n";
+				if (call.out.meta_type == meta_information::id) {
+					lua_cdef_wrapper += "---@return " + lua_id(call.out.type.c_type) + "\n";
+				} else {
+					lua_cdef_wrapper += "---@return " + call.out.type.lua_type + "\n";
+				}
 			}
 
 			if (lua_args.length() > 0) {
