@@ -1240,12 +1240,12 @@ int main(int argc, char *argv[]) {
 				if(involved_in.linked_as->ltype == list_type::array || involved_in.linked_as->ltype == list_type::std_vector) {
 					auto access = project_prefix + ob.name + "_get_range_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name;
 					header_output += "DCON_LUADLL_API int32_t " + access + "(int32_t i); \n";
-					output += "int32_t " + project_prefix + access + "(int32_t i) { \n";
+					output += "int32_t " + access + "(int32_t i) { \n";
 					output += "\tauto index = " + parsed_file.namspace + "::" + ob.name + "_id{" + parsed_file.namspace + "::" + ob.name + "_id::value_base_t(i)};\n";
 					output += "\tauto rng = " + game_state + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
-					lua_cdef += "int32_t " + project_prefix + access + "(int32_t i);\n";
+					lua_cdef += "int32_t " + access + "(int32_t i);\n";
 					lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
 					lua_cdef_wrapper += "---@return number\n";
 					lua_cdef_wrapper += "function " + lua_namespace + ".get_range_length_" + involved_in.relation_name + "(id)\n";
