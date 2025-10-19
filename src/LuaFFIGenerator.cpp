@@ -856,7 +856,7 @@ int main(int argc, char *argv[]) {
 	header_output += "\n";
 	header_output += "#include <stdint.h>\n";
 	header_output += "using lua_reference_type = int32_t;\n";
-	header_output += "#include \"" + base_include_name + "\"\n";
+	// header_output += "#include \"" + base_include_name + "\"\n";
 	header_output += "#ifdef _WIN32\n";
 	header_output += "#define DCON_LUADLL_API __declspec(dllexport)\n";
 	header_output += "#else\n";
