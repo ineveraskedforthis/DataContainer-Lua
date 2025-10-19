@@ -1245,6 +1245,7 @@ int main(int argc, char *argv[]) {
 					output += "\tauto rng = " + game_state + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn int32_t(rng.end() - rng.begin());\n";
 					output += "}\n";
+					lua_cdef += "int32_t " + project_prefix + access + "(int32_t i);\n";
 					lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
 					lua_cdef_wrapper += "---@return number\n";
 					lua_cdef_wrapper += "function " + lua_namespace + ".get_range_length_" + involved_in.relation_name + "(id)\n";
@@ -1258,6 +1259,7 @@ int main(int argc, char *argv[]) {
 					output += "\tauto rng = " + game_state + ob.name + "_get_" + involved_in.relation_name + "_as_" + involved_in.linked_as->property_name + "(index);\n";
 					output += "\treturn rng.begin()[subindex].id.index();\n";
 					output += "}\n";
+					lua_cdef += "int32_t " + access + "(int32_t i, int32_t subindex);\n";
 					lua_cdef_wrapper += "---@param id " + lua_id(ob.name + "_id") + "\n";
 					lua_cdef_wrapper += "---@param index number\n";
 					lua_cdef_wrapper += "---@return " + lua_id(involved_in.relation_name + "_id") + "\n";
