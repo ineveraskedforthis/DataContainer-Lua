@@ -873,7 +873,7 @@ int main(int argc, char *argv[]) {
 
 	output += "\n";
 	// output += "DCON_LUADLL_API " + parsed_file.namspace + "::data_container* state_ffi_ptr;\n";
-	output += "void (*release_object_function)(int32_t) = nullptr;\n";
+	output += "static void (*release_object_function)(int32_t) = nullptr;\n";
 	output += "\n";
 
 	header_output += "extern \"C\" {\n";
