@@ -1322,12 +1322,21 @@ int main(int argc, char *argv[]) {
 			output += "}\n";
 		};
 		auto make_simple_create = [&]() {
-			header_output += "DCON_LUADLL_API int32_t " + project_prefix + "create_" + ob.name + "(); \n";
+			auto access =  project_prefix + "create_" + ob.name;
+
+			header_output += "DCON_LUADLL_API int32_t " + access + "(); \n";
 			output += "int32_t " + project_prefix + "create_" + ob.name + "() { \n";
 			output += "\tauto result = "+game_state+"create_" + ob.name + "();\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
+
+			lua_cdef += "int32_t " + access + "(int32_t i);\n";
+			lua_cdef_wrapper += "---@return number\n";
+			lua_cdef_wrapper += "function " + lua_namespace + ".create" + ob.name + "()\n";
+			lua_cdef_wrapper += "\treturn ffi.C." + access + "(id)\n";
+			lua_cdef_wrapper += "end\n";
 		};
+
 		auto make_delete = [&]() {
 			header_output += "DCON_LUADLL_API void " + project_prefix + "delete_" + ob.name + "(int32_t j); \n";
 			output += "void " + project_prefix + "delete_" + ob.name + "(int32_t j) { \n";
