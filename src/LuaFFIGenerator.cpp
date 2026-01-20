@@ -1414,6 +1414,8 @@ int main(int argc, char *argv[]) {
 			lua_cdef_wrapper += "\treturn ffi.C.try_create_" + ob.name + "(" + lua_args + ")\n";
 			lua_cdef_wrapper += "end\n";
 
+			lua_cdef += "int32_t " + project_prefix + "force_create_" + ob.name + "(" + pargs + "); \n";
+
 			lua_cdef_wrapper += annotation;
 			lua_cdef_wrapper += "---@return " + lua_id(ob.name + "_id") +  "\n";
 			lua_cdef_wrapper += "function " + lua_namespace + ".force_create(" + lua_args + ")\n";
