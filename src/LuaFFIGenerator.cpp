@@ -1331,7 +1331,7 @@ int main(int argc, char *argv[]) {
 			output += "}\n";
 
 			lua_cdef += "int32_t " + access + "(int32_t i);\n";
-			lua_cdef_wrapper += "---@return number\n";
+			lua_cdef_wrapper += "---@return " + lua_id(ob.name + "_id") +  "\n";
 			lua_cdef_wrapper += "function " + lua_namespace + ".create()\n";
 			lua_cdef_wrapper += "\treturn ffi.C." + access + "()\n";
 			lua_cdef_wrapper += "end\n";
