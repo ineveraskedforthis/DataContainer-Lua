@@ -1364,15 +1364,20 @@ int main(int argc, char *argv[]) {
 		auto make_relation_create = [&]() {
 			std::string params;
 			std::string pargs;
+			std::string annotation;
+			std::string lua_args;
 			int32_t pcount = 1;
 			for(auto& i : ob.indexed_objects) {
 				if(params.length() != 0) {
 					params += ", ";
 					pargs += ", ";
+					lua_args += ", ";
 				}
 				if(i.multiplicity == 1) {
 					params += parsed_file.namspace + "::" + i.type_name + "_id{" + parsed_file.namspace + "::" + i.type_name + "_id::value_base_t(p" + std::to_string(pcount) + ")}";
 					pargs += "int32_t p" + std::to_string(pcount);
+					annotation += "---@param " +  i.type_name + "_id_" + std::to_string(pcount) + " " +  i.type_name + "_id\n";
+					lua_args += i.type_name + "_id_" + std::to_string(pcount);
 					pcount++;
 				} else {
 					params += parsed_file.namspace + "::" + i.type_name + "_id{" + parsed_file.namspace + "::" + i.type_name + "_id::value_base_t(p" + std::to_string(pcount) + ")}";
@@ -1382,6 +1387,8 @@ int main(int argc, char *argv[]) {
 					for(int32_t j = 1; j < i.multiplicity; ++j) {
 						params += ", " + parsed_file.namspace + "::" + i.type_name + "_id{" + parsed_file.namspace + "::" + i.type_name + "_id::value_base_t(p" + std::to_string(pcount) + ")}";
 						pargs += ", int32_t p" + std::to_string(pcount);
+						annotation += "---@param " +  i.type_name + "_id_" + std::to_string(pcount) + " " +  i.type_name + "_id\n";
+						lua_args += i.type_name + "_id_" + std::to_string(pcount);
 						pcount++;
 					}
 				}
@@ -1398,6 +1405,20 @@ int main(int argc, char *argv[]) {
 			output += "\tauto result = "+game_state+"force_create_" + ob.name + "(" + params + ");\n";
 			output += "\treturn result.index();\n";
 			output += "}\n";
+
+			lua_cdef += "int32_t " + project_prefix + "try_create_" + ob.name + "(" + pargs + "); \n";
+
+			lua_cdef_wrapper += annotation;
+			lua_cdef_wrapper += "---@return " + lua_id(ob.name + "_id") +  "\n";
+			lua_cdef_wrapper += "function " + lua_namespace + ".try_create(" + lua_args + ")\n";
+			lua_cdef_wrapper += "\treturn ffi.C.try_create_" + ob.name + "(" + lua_args + ")\n";
+			lua_cdef_wrapper += "end\n";
+
+			lua_cdef_wrapper += annotation;
+			lua_cdef_wrapper += "---@return " + lua_id(ob.name + "_id") +  "\n";
+			lua_cdef_wrapper += "function " + lua_namespace + ".force_create(" + lua_args + ")\n";
+			lua_cdef_wrapper += "\treturn ffi.C.force_create_" + ob.name + "(" + lua_args + ")\n";
+			lua_cdef_wrapper += "end\n";
 		};
 
 		if(!ob.is_relationship) {
